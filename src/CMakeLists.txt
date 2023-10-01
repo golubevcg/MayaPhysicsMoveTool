@@ -1,5 +1,5 @@
 set(SOURCE_FILES
-    "main.cpp"
+    "customMoveManip.cpp"
 )
 
 find_package(Maya REQUIRED)

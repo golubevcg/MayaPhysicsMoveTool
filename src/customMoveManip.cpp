@@ -19,12 +19,12 @@
     ----------------------
     The move manipulator context and tool button can be created with the
     following mel commands:
-        myMoveManipContext;
+        customMoveManipContext;
         setParent Shelf1;
         toolButton  -cl toolCluster
-                    -t myMoveManipContext1
-                    -i1 "myMoveToolManip.xpm"
-                    myMoveManip;
+                    -t customMoveManipContext1
+                    -i1 "moveToolManip.xpm"
+                    customMoveManip;
     If the preceding commands were used to create the manipulator context,
     the following commands can destroy it:
         deleteUI moveManipContext1;
@@ -60,48 +60,49 @@
 // Manipulators
 #include <maya/MFnFreePointTriadManip.h>
 #include <maya/MFnDistanceManip.h>
-class moveManip : public MPxManipContainer
+class CustomMoveManip : public MPxManipContainer
 {
 
 public:
-    moveManip();
-    ~moveManip() override;
+    CustomMoveManip();
+    ~CustomMoveManip() override;
 
     static void* creator();
     static MStatus initialize();
     MStatus createChildren() override;
     MStatus connectToDependNode(const MObject& node) override;
     // Viewport 2.0 rendering
-    void        drawUI(MHWRender::MUIDrawManager& drawManager, const MHWRender::MFrameContext& frameContext) const override;
+    void drawUI(MHWRender::MUIDrawManager& drawManager, const MHWRender::MFrameContext& frameContext) const override;
     MStatus doDrag() override;
 private:
     void updateManipLocations(const MObject& node);
 public:
     MDagPath fDistanceManip;
     MDagPath fFreePointManip;
+    MSelectionList selList;
     static MTypeId id;
 };
-MTypeId moveManip::id(0x8001d);
+MTypeId CustomMoveManip::id(0x8001d);
 
-moveManip::moveManip()
+CustomMoveManip::CustomMoveManip()
 {
     // The constructor must not call createChildren for user-defined
     // manipulators.
 }
-moveManip::~moveManip()
+CustomMoveManip::~CustomMoveManip()
 {
 }
-void* moveManip::creator()
+void* CustomMoveManip::creator()
 {
-    return new moveManip();
+    return new CustomMoveManip();
 }
-MStatus moveManip::initialize()
+MStatus CustomMoveManip::initialize()
 {
     MStatus stat;
     stat = MPxManipContainer::initialize();
     return stat;
 }
-MStatus moveManip::createChildren()
+MStatus CustomMoveManip::createChildren()
 {
     MStatus stat = MStatus::kSuccess;
     fDistanceManip = addDistanceManip("distanceManip",
@@ -118,7 +119,7 @@ MStatus moveManip::createChildren()
     return stat;
 }
 
-void moveManip::updateManipLocations(const MObject& node)
+void CustomMoveManip::updateManipLocations(const MObject& node)
 //
 // Description
 //        setTranslation and setRotation to the parent's transformation.
@@ -137,7 +138,7 @@ void moveManip::updateManipLocations(const MObject& node)
     manipFn.setTranslation(trans, MSpace::kWorld);
 }
 
-MStatus moveManip::connectToDependNode(const MObject& node)
+MStatus CustomMoveManip::connectToDependNode(const MObject& node)
 {
     MStatus stat;
     //
@@ -159,21 +160,50 @@ MStatus moveManip::connectToDependNode(const MObject& node)
 }
 // Viewport 2.0 manipulator draw overrides
 
-MStatus moveManip::doDrag()
+MStatus CustomMoveManip::doDrag()
 {
     // Call the parent class's doDrag function
-    //MStatus status = MPxManipContainer::doDrag(view);
-
     // Add any additional functionality here if needed
-    std::cout << "Dragging..." << std::endl;
 
-    MString txt = "Object: tratata";
+    MStatus status;
+    MString txt = "Moving Objects:";
+    
+    MGlobal::getActiveSelectionList(selList);
+    MItSelectionList iter(selList);
+
+    if (iter.isDone()) {
+        txt += "No objects selected";
+    }
+    else {
+        for (; !iter.isDone(); iter.next()) {
+            txt += 1;
+            MGlobal::displayInfo(txt);
+
+            MObject node;
+
+            txt += 1;
+            MGlobal::displayInfo(txt);
+            iter.getDependNode(node);
+            
+            txt += 1;
+            MGlobal::displayInfo(txt);
+            MFnDependencyNode depNodeFn;
+            
+            txt += 1;
+            MGlobal::displayInfo(txt);
+            depNodeFn.setObject(node);
+
+            txt += depNodeFn.name() + " ";
+            MGlobal::displayInfo(txt);
+        }
+    }
+
     MGlobal::displayInfo(txt);
 
-    return MS::kUnknownParameter;;
+    return MS::kUnknownParameter;
 }
 
-void moveManip::drawUI(MHWRender::MUIDrawManager& drawManager, const MHWRender::MFrameContext& frameContext) const
+void CustomMoveManip::drawUI(MHWRender::MUIDrawManager& drawManager, const MHWRender::MFrameContext& frameContext) const
 {
     drawManager.beginDrawable();
     drawManager.setColor(MColor(0.0f, 1.0f, 0.1f));
@@ -186,10 +216,10 @@ void moveManip::drawUI(MHWRender::MUIDrawManager& drawManager, const MHWRender::
 //
 // This class is a simple context for supporting a move manipulator.
 //
-class MoveManipContext : public MPxSelectionContext
+class CustomMoveManipContext : public MPxSelectionContext
 {
 public:
-    MoveManipContext();
+    CustomMoveManipContext();
     void    toolOnSetup(MEvent& event) override;
     void    toolOffCleanup() override;
     // Callback issued when selection list changes
@@ -197,12 +227,12 @@ public:
 private:
     MCallbackId id1;
 };
-MoveManipContext::MoveManipContext()
+CustomMoveManipContext::CustomMoveManipContext()
 {
     MString str("Plugin move Manipulator");
     setTitleString(str);
 }
-void MoveManipContext::toolOnSetup(MEvent&)
+void CustomMoveManipContext::toolOnSetup(MEvent&)
 {
     MString str("Move the object using the manipulator");
     setHelpString(str);
@@ -215,7 +245,7 @@ void MoveManipContext::toolOnSetup(MEvent&)
         MGlobal::displayError("Model addCallback failed");
     }
 }
-void MoveManipContext::toolOffCleanup()
+void CustomMoveManipContext::toolOffCleanup()
 {
     MStatus status;
     status = MModelMessage::removeCallback(id1);
@@ -224,11 +254,11 @@ void MoveManipContext::toolOffCleanup()
     }
     MPxContext::toolOffCleanup();
 }
-void MoveManipContext::updateManipulators(void* data)
+void CustomMoveManipContext::updateManipulators(void* data)
 {
     MStatus stat = MStatus::kSuccess;
 
-    MoveManipContext* ctxPtr = (MoveManipContext*)data;
+    CustomMoveManipContext* ctxPtr = (CustomMoveManipContext*)data;
     ctxPtr->deleteManipulators();
     MSelectionList list;
     stat = MGlobal::getActiveSelectionList(list);
@@ -256,10 +286,10 @@ void MoveManipContext::updateManipulators(void* data)
             }
             // Add manipulator to the selected object
             //
-            MString manipName("myMoveManip");
+            MString manipName("customMoveManip");
             MObject manipObject;
-            moveManip* manipulator =
-                (moveManip*)moveManip::newManipulator(manipName, manipObject);
+            CustomMoveManip* manipulator =
+                (CustomMoveManip*)CustomMoveManip::newManipulator(manipName, manipObject);
             if (NULL != manipulator) {
                 // Add the manipulator
                 //
@@ -281,21 +311,21 @@ void MoveManipContext::updateManipulators(void* data)
 // This is the command that will be used to create instances
 // of our context.
 //
-class moveManipContext : public MPxContextCommand
+class CustoMoveManipContext : public MPxContextCommand
 {
 public:
-    moveManipContext() {};
+    CustoMoveManipContext() {};
     MPxContext* makeObj() override;
 public:
     static void* creator();
 };
-MPxContext* moveManipContext::makeObj()
+MPxContext* CustoMoveManipContext::makeObj()
 {
-    return new MoveManipContext();
+    return new CustomMoveManipContext();
 }
-void* moveManipContext::creator()
+void* CustoMoveManipContext::creator()
 {
-    return new moveManipContext;
+    return new CustoMoveManipContext;
 }
 //
 // The following routines are used to register/unregister
@@ -305,17 +335,17 @@ MStatus initializePlugin(MObject obj)
 {
     MStatus status;
     MFnPlugin plugin(obj, PLUGIN_COMPANY, "1.0", "Andrew Golubev");
-    status = plugin.registerContextCommand("myMoveManipContext",
-        &moveManipContext::creator);
+    status = plugin.registerContextCommand("customMoveManipContext",
+        &CustoMoveManipContext::creator);
     if (!status) {
-        MGlobal::displayError("Error registering moveManipContext command");
+        MGlobal::displayError("Error registering customMoveManipContext command");
         return status;
     }
-    status = plugin.registerNode("myMoveManip", moveManip::id,
-        &moveManip::creator, &moveManip::initialize,
+    status = plugin.registerNode("customMoveManip", CustomMoveManip::id,
+        &CustomMoveManip::creator, &CustomMoveManip::initialize,
         MPxNode::kManipContainer);
     if (!status) {
-        MGlobal::displayError("Error registering moveManip node");
+        MGlobal::displayError("Error registering customMoveManip node");
         return status;
     }
     return status;
@@ -324,14 +354,14 @@ MStatus uninitializePlugin(MObject obj)
 {
     MStatus status;
     MFnPlugin plugin(obj);
-    status = plugin.deregisterContextCommand("myMoveManipContext");
+    status = plugin.deregisterContextCommand("customMoveManipContext");
     if (!status) {
-        MGlobal::displayError("Error deregistering moveManipContext command");
+        MGlobal::displayError("Error deregistering customMoveManipContext command");
         return status;
     }
-    status = plugin.deregisterNode(moveManip::id);
+    status = plugin.deregisterNode(CustomMoveManip::id);
     if (!status) {
-        MGlobal::displayError("Error deregistering moveManip node");
+        MGlobal::displayError("Error deregistering customMoveManip node");
         return status;
     }
     return status;
