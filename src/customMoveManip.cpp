@@ -16,13 +16,24 @@
 #include <maya/MDagPath.h>
 #include <maya/MManipData.h>
 #include <maya/MMatrix.h>
+#include <maya/MItDag.h>
+#include <maya/MFnMesh.h>
+#include <maya/MBoundingBox.h>
+
 // Manipulators
 #include <maya/MFnFreePointTriadManip.h>
 #include <maya/MFnDistanceManip.h>
 // Boost geometry
 #include <boost/geometry.hpp>
-#include <boost/geometry/geometries/point_xy.hpp>
-#include <boost/geometry/geometries/polygon.hpp>
+#include <boost/geometry/index/rtree.hpp>
+#include <vector>
+
+namespace bg = boost::geometry;
+namespace bgi = boost::geometry::index;
+
+typedef bg::model::point<float, 3, bg::cs::cartesian> point;
+typedef bg::model::box<point> box;
+typedef std::pair<box, unsigned> value;
 
 
 class CustomMoveManip : public MPxManipContainer
@@ -40,13 +51,17 @@ public:
     void drawUI(MHWRender::MUIDrawManager& drawManager, const MHWRender::MFrameContext& frameContext) const override;
     MStatus doDrag() override;
     MStatus doPress() override;
-    void addSelectedMObjects(std::vector<MObject> mObjectsVector);
+    MStatus addSelectedMObjects(std::vector<MObject> mObjectsVector);
+    MStatus getSceneMFnMeshes(std::vector<MFnMesh> mObjectsVector);
+    MStatus initializeRTree();
 private:
     void updateManipLocations(const MObject& node);
 public:
     MDagPath fFreePointManip;
     MSelectionList selList;
     std::vector<MObject> selectedObjects;
+    std::vector<MFnMesh> mFnMeshes;
+    bgi::rtree<value, bgi::quadratic<16>> rtree;
     static MTypeId id;
 };
 MTypeId CustomMoveManip::id(0x8001d);
@@ -101,19 +116,30 @@ void CustomMoveManip::updateManipLocations(const MObject& node)
     manipFn.setTranslation(trans, MSpace::kWorld);
     MStatus status;
 
-    CustomMoveManip::addSelectedMObjects(selectedObjects);
+    MString message_text = "addSelectedMObjects";
+    MGlobal::displayInfo(message_text);
+    addSelectedMObjects(selectedObjects);
 
-    
+    message_text = "getSceneMFnMeshes";
+    MGlobal::displayWarning(message_text);
+    getSceneMFnMeshes(mFnMeshes);
 
+    message_text = "initializeRTree";
+    MGlobal::displayWarning(message_text);
+    initializeRTree();
+
+    message_text = "after_init";
+    MGlobal::displayWarning(message_text);
 }
 
-void CustomMoveManip::addSelectedMObjects(std::vector<MObject> mObjectsVector) {
+MStatus CustomMoveManip::addSelectedMObjects(std::vector<MObject> mObjectsVector) {
 
     MGlobal::getActiveSelectionList(selList);
     MItSelectionList iter(selList);
     if (iter.isDone()) {
         MString warningMessage = "No objects selected";
         MGlobal::displayWarning(warningMessage);
+        return MS::kFailure;
     }
     else {
         for (; !iter.isDone(); iter.next()) {
@@ -122,7 +148,65 @@ void CustomMoveManip::addSelectedMObjects(std::vector<MObject> mObjectsVector) {
             mObjectsVector.push_back(node);
         }
     }
+    return MS::kSuccess;
 }
+
+MStatus CustomMoveManip::getSceneMFnMeshes(std::vector<MFnMesh> mObjectsVector) {
+    
+    MStatus status;
+    MItDag dagIterator(MItDag::kDepthFirst, MFn::kMesh, &status);
+
+    if (status != MS::kSuccess) {
+        MGlobal::displayError("MItDag initialization failed");
+        return status;
+    }
+
+    for (; !dagIterator.isDone(); dagIterator.next()) {
+        MDagPath dagPath;
+        status = dagIterator.getPath(dagPath);
+
+        if (status != MS::kSuccess) {
+            MGlobal::displayError("Failed to get MDagPath");
+            continue;
+        }
+
+        MFnMesh fnMesh(dagPath, &status);
+        if (status != MS::kSuccess) {
+            MGlobal::displayError("MFnMesh initialization failed");
+            continue;
+        }
+
+        MBoundingBox boundingBox = fnMesh.boundingBox(&status);
+        if (status != MS::kSuccess) {
+            MGlobal::displayError("Failed to get bounding box");
+            continue;
+        }
+
+        mFnMeshes.push_back(fnMesh);
+    }
+
+    return MS::kSuccess;
+}
+
+MStatus CustomMoveManip::initializeRTree() {
+
+    if (mFnMeshes.empty()) {
+        MGlobal::displayError("MFnMeshes vector is empty");
+        return MS::kFailure;
+    }
+
+    MStatus status;
+
+    for (size_t i = 0; i < mFnMeshes.size(); ++i) {
+        MBoundingBox mbbox = mFnMeshes[i].boundingBox(&status);
+        MPoint minPoint = mbbox.min();
+        MPoint maxPoint = mbbox.max();
+
+        box bbox(point(minPoint.x, minPoint.y, minPoint.z), point(maxPoint.x, maxPoint.y, maxPoint.z));
+        rtree.insert(std::make_pair(bbox, i));  // i is the identifier
+    }
+}
+
 
 MStatus CustomMoveManip::connectToDependNode(const MObject& node)
 {
