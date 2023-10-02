@@ -1,47 +1,6 @@
-//-
-// ==========================================================================
-// Copyright 1995,2006,2008 Autodesk, Inc. All rights reserved.
-//
-// Use of this software is subject to the terms of the Autodesk
-// license agreement provided at the time of installation or download,
-// or which otherwise accompanies this software in either electronic
-// or hard copy form.
-// ==========================================================================
-//+
-/*
-    This example demonstrates the FreePointTriad and Distance manipulators in
-    the API.  This example uses three classes to accomplish this task: First,
-    a context command (moveManipContext) is provided to create instances of
-    the context.  Next, a custom selection context (MoveManipContext) is
-    created to manage the rotation manipulator.   Finally, the rotation
-    manipulator is provided as a custom node class.
-    Loading and unloading:
-    ----------------------
-    The move manipulator context and tool button can be created with the
-    following mel commands:
-        customMoveManipContext;
-        setParent Shelf1;
-        toolButton  -cl toolCluster
-                    -t customMoveManipContext1
-                    -i1 "moveToolManip.xpm"
-                    customMoveManip;
-    If the preceding commands were used to create the manipulator context,
-    the following commands can destroy it:
-        deleteUI moveManipContext1;
-        deleteUI moveManip;
-    If the plugin is loaded and unloaded frequently (eg. during testing),
-    it is useful to make these command sequences into shelf buttons.
-    How to use:
-    -----------
-    Once the tool button has been created using the script above, select the
-    tool button then click on an object.  The move manipulator should appear
-    at the center of the selected object and a distance manipulator should
-    appear at the origin.  Use the move manipulator to move the object, and
-    the distance manipulator to control the scaling in Y direction.
-
-*/
 #include <maya/MIOStream.h>
 #include <stdio.h>
+#include <vector>
 #include <stdlib.h>
 #include <maya/MFn.h>
 #include <maya/MPxNode.h>
@@ -60,6 +19,12 @@
 // Manipulators
 #include <maya/MFnFreePointTriadManip.h>
 #include <maya/MFnDistanceManip.h>
+// Boost geometry
+#include <boost/geometry.hpp>
+#include <boost/geometry/geometries/point_xy.hpp>
+#include <boost/geometry/geometries/polygon.hpp>
+
+
 class CustomMoveManip : public MPxManipContainer
 {
 
@@ -74,12 +39,14 @@ public:
     // Viewport 2.0 rendering
     void drawUI(MHWRender::MUIDrawManager& drawManager, const MHWRender::MFrameContext& frameContext) const override;
     MStatus doDrag() override;
+    MStatus doPress() override;
+    void addSelectedMObjects(std::vector<MObject> mObjectsVector);
 private:
     void updateManipLocations(const MObject& node);
 public:
-    MDagPath fDistanceManip;
     MDagPath fFreePointManip;
     MSelectionList selList;
+    std::vector<MObject> selectedObjects;
     static MTypeId id;
 };
 MTypeId CustomMoveManip::id(0x8001d);
@@ -89,9 +56,11 @@ CustomMoveManip::CustomMoveManip()
     // The constructor must not call createChildren for user-defined
     // manipulators.
 }
+
 CustomMoveManip::~CustomMoveManip()
 {
 }
+
 void* CustomMoveManip::creator()
 {
     return new CustomMoveManip();
@@ -102,18 +71,12 @@ MStatus CustomMoveManip::initialize()
     stat = MPxManipContainer::initialize();
     return stat;
 }
+
 MStatus CustomMoveManip::createChildren()
 {
     MStatus stat = MStatus::kSuccess;
-    fDistanceManip = addDistanceManip("distanceManip",
-        "distance");
-    // The distance manip will extend in the y-direction.
-    //
-    MFnDistanceManip distanceManipFn(fDistanceManip);
     MPoint startPoint(0.0, 0.0, 0.0);
     MVector direction(0.0, 1.0, 0.0);
-    distanceManipFn.setStartPoint(startPoint);
-    distanceManipFn.setDirection(direction);
     fFreePointManip = addFreePointTriadManip("pointManip",
         "freePoint");
     return stat;
@@ -136,6 +99,29 @@ void CustomMoveManip::updateManipLocations(const MObject& node)
     manipFn.setRotation(rot, rOrder);
     MVector trans = m.getTranslation(MSpace::kWorld);
     manipFn.setTranslation(trans, MSpace::kWorld);
+    MStatus status;
+
+    CustomMoveManip::addSelectedMObjects(selectedObjects);
+
+    
+
+}
+
+void CustomMoveManip::addSelectedMObjects(std::vector<MObject> mObjectsVector) {
+
+    MGlobal::getActiveSelectionList(selList);
+    MItSelectionList iter(selList);
+    if (iter.isDone()) {
+        MString warningMessage = "No objects selected";
+        MGlobal::displayWarning(warningMessage);
+    }
+    else {
+        for (; !iter.isDone(); iter.next()) {
+            MObject node;
+            iter.getDependNode(node);
+            mObjectsVector.push_back(node);
+        }
+    }
 }
 
 MStatus CustomMoveManip::connectToDependNode(const MObject& node)
@@ -147,10 +133,7 @@ MStatus CustomMoveManip::connectToDependNode(const MObject& node)
     // manipulator.
     //
     MFnDependencyNode nodeFn(node);
-    MPlug syPlug = nodeFn.findPlug("scaleY", true, &stat);
     MPlug tPlug = nodeFn.findPlug("translate", true, &stat);
-    MFnDistanceManip distanceManipFn(fDistanceManip);
-    distanceManipFn.connectToDistancePlug(syPlug);
     MFnFreePointTriadManip freePointManipFn(fFreePointManip);
     freePointManipFn.connectToPointPlug(tPlug);
     updateManipLocations(node);
@@ -160,6 +143,16 @@ MStatus CustomMoveManip::connectToDependNode(const MObject& node)
 }
 // Viewport 2.0 manipulator draw overrides
 
+MStatus CustomMoveManip::doPress()
+{
+    MStatus status = MPxManipContainer::doPress();
+
+    // Your custom code here
+    MGlobal::displayInfo("Mouse pressed, object selected");
+
+    return status;
+}
+
 MStatus CustomMoveManip::doDrag()
 {
     // Call the parent class's doDrag function
@@ -168,36 +161,6 @@ MStatus CustomMoveManip::doDrag()
     MStatus status;
     MString txt = "Moving Objects:";
     
-    MGlobal::getActiveSelectionList(selList);
-    MItSelectionList iter(selList);
-
-    if (iter.isDone()) {
-        txt += "No objects selected";
-    }
-    else {
-        for (; !iter.isDone(); iter.next()) {
-            txt += 1;
-            MGlobal::displayInfo(txt);
-
-            MObject node;
-
-            txt += 1;
-            MGlobal::displayInfo(txt);
-            iter.getDependNode(node);
-            
-            txt += 1;
-            MGlobal::displayInfo(txt);
-            MFnDependencyNode depNodeFn;
-            
-            txt += 1;
-            MGlobal::displayInfo(txt);
-            depNodeFn.setObject(node);
-
-            txt += depNodeFn.name() + " ";
-            MGlobal::displayInfo(txt);
-        }
-    }
-
     MGlobal::displayInfo(txt);
 
     return MS::kUnknownParameter;
@@ -211,6 +174,7 @@ void CustomMoveManip::drawUI(MHWRender::MUIDrawManager& drawManager, const MHWRe
 
     drawManager.endDrawable();
 }
+
 //
 // MoveManipContext
 //
@@ -227,11 +191,13 @@ public:
 private:
     MCallbackId id1;
 };
+
 CustomMoveManipContext::CustomMoveManipContext()
 {
     MString str("Plugin move Manipulator");
     setTitleString(str);
 }
+
 void CustomMoveManipContext::toolOnSetup(MEvent&)
 {
     MString str("Move the object using the manipulator");
@@ -245,6 +211,7 @@ void CustomMoveManipContext::toolOnSetup(MEvent&)
         MGlobal::displayError("Model addCallback failed");
     }
 }
+
 void CustomMoveManipContext::toolOffCleanup()
 {
     MStatus status;
@@ -254,6 +221,7 @@ void CustomMoveManipContext::toolOffCleanup()
     }
     MPxContext::toolOffCleanup();
 }
+
 void CustomMoveManipContext::updateManipulators(void* data)
 {
     MStatus stat = MStatus::kSuccess;
@@ -305,6 +273,7 @@ void CustomMoveManipContext::updateManipulators(void* data)
         }
     }
 }
+
 //
 // moveManipContext
 //
@@ -319,14 +288,17 @@ public:
 public:
     static void* creator();
 };
+
 MPxContext* CustoMoveManipContext::makeObj()
 {
     return new CustomMoveManipContext();
 }
+
 void* CustoMoveManipContext::creator()
 {
     return new CustoMoveManipContext;
 }
+
 //
 // The following routines are used to register/unregister
 // the context and manipulator
@@ -350,6 +322,7 @@ MStatus initializePlugin(MObject obj)
     }
     return status;
 }
+
 MStatus uninitializePlugin(MObject obj)
 {
     MStatus status;
