@@ -52,7 +52,7 @@ public:
     MStatus doDrag() override;
     MStatus doPress() override;
     MStatus addSelectedMObjects(std::vector<MObject> mObjectsVector);
-    MStatus getSceneMFnMeshes(std::vector<MFnMesh> mObjectsVector);
+    MStatus getSceneMFnMeshes(std::vector<MFnMesh*> mObjectsVector);
     MStatus initializeRTree();
 private:
     void updateManipLocations(const MObject& node);
@@ -60,7 +60,7 @@ public:
     MDagPath fFreePointManip;
     MSelectionList selList;
     std::vector<MObject> selectedObjects;
-    std::vector<MFnMesh> mFnMeshes;
+    std::vector<MFnMesh*> mFnMeshes;
     bgi::rtree<value, bgi::quadratic<16>> rtree;
     static MTypeId id;
 };
@@ -74,6 +74,9 @@ CustomMoveManip::CustomMoveManip()
 
 CustomMoveManip::~CustomMoveManip()
 {
+    for (MFnMesh* mesh : mFnMeshes) {
+        delete mesh;
+    }
 }
 
 void* CustomMoveManip::creator()
@@ -130,7 +133,7 @@ void CustomMoveManip::updateManipLocations(const MObject& node)
 
     message_text = "after_init";
     MGlobal::displayWarning(message_text);
-}
+} 
 
 MStatus CustomMoveManip::addSelectedMObjects(std::vector<MObject> mObjectsVector) {
 
@@ -151,7 +154,7 @@ MStatus CustomMoveManip::addSelectedMObjects(std::vector<MObject> mObjectsVector
     return MS::kSuccess;
 }
 
-MStatus CustomMoveManip::getSceneMFnMeshes(std::vector<MFnMesh> mObjectsVector) {
+MStatus CustomMoveManip::getSceneMFnMeshes(std::vector<MFnMesh*> mObjectsVector) {
     
     MStatus status;
     MItDag dagIterator(MItDag::kDepthFirst, MFn::kMesh, &status);
@@ -170,13 +173,13 @@ MStatus CustomMoveManip::getSceneMFnMeshes(std::vector<MFnMesh> mObjectsVector) 
             continue;
         }
 
-        MFnMesh fnMesh(dagPath, &status);
+        MFnMesh* fnMesh = new MFnMesh(dagPath, &status);
         if (status != MS::kSuccess) {
             MGlobal::displayError("MFnMesh initialization failed");
             continue;
         }
 
-        MBoundingBox boundingBox = fnMesh.boundingBox(&status);
+        MBoundingBox boundingBox = fnMesh->boundingBox(&status);
         if (status != MS::kSuccess) {
             MGlobal::displayError("Failed to get bounding box");
             continue;
@@ -198,7 +201,7 @@ MStatus CustomMoveManip::initializeRTree() {
     MStatus status;
 
     for (size_t i = 0; i < mFnMeshes.size(); ++i) {
-        MBoundingBox mbbox = mFnMeshes[i].boundingBox(&status);
+        MBoundingBox mbbox = mFnMeshes[i]->boundingBox(&status);
         MPoint minPoint = mbbox.min();
         MPoint maxPoint = mbbox.max();
 
@@ -249,6 +252,7 @@ MStatus CustomMoveManip::doDrag()
 
     return MS::kUnknownParameter;
 }
+
 
 void CustomMoveManip::drawUI(MHWRender::MUIDrawManager& drawManager, const MHWRender::MFrameContext& frameContext) const
 {
