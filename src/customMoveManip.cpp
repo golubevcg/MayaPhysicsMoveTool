@@ -51,8 +51,8 @@ public:
     void drawUI(MHWRender::MUIDrawManager& drawManager, const MHWRender::MFrameContext& frameContext) const override;
     MStatus doDrag() override;
     MStatus doPress() override;
-    MStatus addSelectedMObjects(std::vector<MObject> mObjectsVector);
-    MStatus getSceneMFnMeshes(std::vector<MFnMesh*> mObjectsVector);
+    MStatus addSelectedMObjects();
+    MStatus getSceneMFnMeshes();
     MStatus initializeRTree();
     void checkNearbyObjects();
 private:
@@ -64,6 +64,7 @@ public:
     std::vector<MFnMesh*> mFnMeshes;
     bgi::rtree<value, bgi::quadratic<16>> rtree;
     static MTypeId id;
+
 };
 MTypeId CustomMoveManip::id(0x8001d);
 
@@ -71,6 +72,22 @@ CustomMoveManip::CustomMoveManip()
 {
     // The constructor must not call createChildren for user-defined
     // manipulators.
+
+    MString message_text = "getSceneMFnMeshes";
+    MGlobal::displayWarning(message_text);
+    getSceneMFnMeshes();
+
+    message_text = "MFnMeshes:";
+    MGlobal::displayInfo(message_text);
+    for (const auto& mesh : mFnMeshes) {
+        MString meshInfo = "Mesh: ";
+        meshInfo += mesh->name();  // Assuming MFnMesh has a name() method to get the mesh name
+        MGlobal::displayInfo(meshInfo);
+    }
+
+    message_text = "initializeRTree";
+    MGlobal::displayWarning(message_text);
+    initializeRTree();
 }
 
 CustomMoveManip::~CustomMoveManip()
@@ -88,6 +105,9 @@ MStatus CustomMoveManip::initialize()
 {
     MStatus stat;
     stat = MPxManipContainer::initialize();
+
+    MString message_text = "CustomMoveManip initialized";
+    MGlobal::displayInfo(message_text);
     return stat;
 }
 
@@ -98,14 +118,6 @@ MStatus CustomMoveManip::createChildren()
     MVector direction(0.0, 1.0, 0.0);
     fFreePointManip = addFreePointTriadManip("pointManip",
         "freePoint");
-
-    MString message_text = "getSceneMFnMeshes";
-    MGlobal::displayWarning(message_text);
-    getSceneMFnMeshes(mFnMeshes);
-
-    message_text = "initializeRTree";
-    MGlobal::displayWarning(message_text);
-    initializeRTree();
 
     return stat;
 }
@@ -133,10 +145,13 @@ void CustomMoveManip::updateManipLocations(const MObject& node)
     MGlobal::displayWarning(message_text);
 } 
 
-MStatus CustomMoveManip::addSelectedMObjects(std::vector<MObject> mObjectsVector) {
+MStatus CustomMoveManip::addSelectedMObjects() {
 
     MGlobal::getActiveSelectionList(selList);
     MItSelectionList iter(selList);
+
+    selectedObjects.clear();
+
     if (iter.isDone()) {
         MString warningMessage = "No objects selected";
         MGlobal::displayWarning(warningMessage);
@@ -146,13 +161,13 @@ MStatus CustomMoveManip::addSelectedMObjects(std::vector<MObject> mObjectsVector
         for (; !iter.isDone(); iter.next()) {
             MObject node;
             iter.getDependNode(node);
-            mObjectsVector.push_back(node);
+            selectedObjects.push_back(node);
         }
     }
     return MS::kSuccess;
 }
 
-MStatus CustomMoveManip::getSceneMFnMeshes(std::vector<MFnMesh*> mObjectsVector) {
+MStatus CustomMoveManip::getSceneMFnMeshes() {
     
     MStatus status;
     MItDag dagIterator(MItDag::kDepthFirst, MFn::kMesh, &status);
@@ -199,21 +214,24 @@ MStatus CustomMoveManip::initializeRTree() {
     MStatus status;
 
     for (size_t i = 0; i < mFnMeshes.size(); ++i) {
-        MObject object = mFnMeshes[i]->object(&status);
+        MDagPath dagPath;
+        status = mFnMeshes[i]->getPath(dagPath);
         if (status != MS::kSuccess) {
-            MGlobal::displayError("Failed to get MObject from MFnMesh");
+            MGlobal::displayError("Failed to get MDagPath from MFnMesh");
             return status;
         }
 
-        MFnDagNode dagNode(object);
-        MBoundingBox mbbox = dagNode.boundingBox(&status);
-        if (status != MS::kSuccess) {
-            MGlobal::displayError("Failed to get bounding box");
-            return status;
-        }
+        MBoundingBox mbbox = mFnMeshes[i]->boundingBox();
+        MMatrix worldMatrix = dagPath.inclusiveMatrix();
 
-        MPoint minPoint = mbbox.min();
-        MPoint maxPoint = mbbox.max();
+        MPoint minPoint = mbbox.min() * worldMatrix;
+        MPoint maxPoint = mbbox.max() * worldMatrix;
+
+        // Printing the min and max points of the bounding box
+        MString bboxInfo = "Bounding Box Info: \n";
+        bboxInfo += "Min Point: (" + MString() + minPoint.x + ", " + MString() + minPoint.y + ", " + MString() + minPoint.z + ")\n";
+        bboxInfo += "Max Point: (" + MString() + maxPoint.x + ", " + MString() + maxPoint.y + ", " + MString() + maxPoint.z + ")";
+        MGlobal::displayInfo(bboxInfo);
 
         box bbox(point(minPoint.x, minPoint.y, minPoint.z), point(maxPoint.x, maxPoint.y, maxPoint.z));
         rtree.insert(std::make_pair(bbox, i));  // i is the identifier
@@ -246,13 +264,6 @@ MStatus CustomMoveManip::doPress()
 {
     MStatus status = MPxManipContainer::doPress();
 
-    MString message_text = "addSelectedMObjects";
-    MGlobal::displayInfo(message_text);
-    addSelectedMObjects(selectedObjects);
-
-    // Your custom code here
-    MGlobal::displayInfo("Mouse pressed, object selected");
-
     return status;
 }
 
@@ -263,22 +274,17 @@ MStatus CustomMoveManip::doDrag()
 
     MStatus status;
     MString txt = "Moving Objects:";
-    checkNearbyObjects();
     MGlobal::displayInfo(txt);
+
+    checkNearbyObjects();
 
     return MS::kUnknownParameter;
 }
 
 void CustomMoveManip::checkNearbyObjects() {
 
-    MString txt = "checkNearbyObjects selectedObjects.size():" + selectedObjects.size();
-    MGlobal::displayInfo(txt);
-
     for (size_t i = 0; i < selectedObjects.size(); ++i) {
         MStatus status;
-
-        MString txt = "iteration";
-        MGlobal::displayInfo(txt);
 
         MFnDagNode dagNode(selectedObjects[i]);
         MBoundingBox boundingBox = dagNode.boundingBox();
@@ -287,6 +293,7 @@ void CustomMoveManip::checkNearbyObjects() {
         double distance = 0.1;
         MPoint minPoint = boundingBox.min() - MVector(distance, distance, distance);
         MPoint maxPoint = boundingBox.max() + MVector(distance, distance, distance);
+        
         box queryBox(point(minPoint.x, minPoint.y, minPoint.z), point(maxPoint.x, maxPoint.y, maxPoint.z));
 
         std::vector<value> result;
@@ -302,8 +309,6 @@ void CustomMoveManip::checkNearbyObjects() {
         }
     }
 }
-
-
 
 void CustomMoveManip::drawUI(MHWRender::MUIDrawManager& drawManager, const MHWRender::MFrameContext& frameContext) const
 {
@@ -358,6 +363,7 @@ void CustomMoveManipContext::toolOffCleanup()
     if (!status) {
         MGlobal::displayError("Model remove callback failed");
     }
+
     MPxContext::toolOffCleanup();
 }
 
@@ -365,7 +371,7 @@ void CustomMoveManipContext::updateManipulators(void* data)
 {
     MStatus stat = MStatus::kSuccess;
 
-    CustomMoveManipContext* ctxPtr = (CustomMoveManipContext*)data;
+        CustomMoveManipContext* ctxPtr = (CustomMoveManipContext*)data;
     ctxPtr->deleteManipulators();
     MSelectionList list;
     stat = MGlobal::getActiveSelectionList(list);
@@ -408,6 +414,7 @@ void CustomMoveManipContext::updateManipulators(void* data)
                     MGlobal::displayWarning("Error connecting manipulator to"
                         " object: " + dependNodeFn.name());
                 }
+                manipulator->addSelectedMObjects();
             }
         }
     }
