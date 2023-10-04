@@ -54,6 +54,7 @@ public:
     MStatus addSelectedMObjects(std::vector<MObject> mObjectsVector);
     MStatus getSceneMFnMeshes(std::vector<MFnMesh*> mObjectsVector);
     MStatus initializeRTree();
+    void checkNearbyObjects();
 private:
     void updateManipLocations(const MObject& node);
 public:
@@ -97,6 +98,15 @@ MStatus CustomMoveManip::createChildren()
     MVector direction(0.0, 1.0, 0.0);
     fFreePointManip = addFreePointTriadManip("pointManip",
         "freePoint");
+
+    MString message_text = "getSceneMFnMeshes";
+    MGlobal::displayWarning(message_text);
+    getSceneMFnMeshes(mFnMeshes);
+
+    message_text = "initializeRTree";
+    MGlobal::displayWarning(message_text);
+    initializeRTree();
+
     return stat;
 }
 
@@ -119,19 +129,7 @@ void CustomMoveManip::updateManipLocations(const MObject& node)
     manipFn.setTranslation(trans, MSpace::kWorld);
     MStatus status;
 
-    MString message_text = "addSelectedMObjects";
-    MGlobal::displayInfo(message_text);
-    addSelectedMObjects(selectedObjects);
-
-    message_text = "getSceneMFnMeshes";
-    MGlobal::displayWarning(message_text);
-    getSceneMFnMeshes(mFnMeshes);
-
-    message_text = "initializeRTree";
-    MGlobal::displayWarning(message_text);
-    initializeRTree();
-
-    message_text = "after_init";
+    MString message_text = "after_init";
     MGlobal::displayWarning(message_text);
 } 
 
@@ -201,13 +199,27 @@ MStatus CustomMoveManip::initializeRTree() {
     MStatus status;
 
     for (size_t i = 0; i < mFnMeshes.size(); ++i) {
-        MBoundingBox mbbox = mFnMeshes[i]->boundingBox(&status);
+        MObject object = mFnMeshes[i]->object(&status);
+        if (status != MS::kSuccess) {
+            MGlobal::displayError("Failed to get MObject from MFnMesh");
+            return status;
+        }
+
+        MFnDagNode dagNode(object);
+        MBoundingBox mbbox = dagNode.boundingBox(&status);
+        if (status != MS::kSuccess) {
+            MGlobal::displayError("Failed to get bounding box");
+            return status;
+        }
+
         MPoint minPoint = mbbox.min();
         MPoint maxPoint = mbbox.max();
 
         box bbox(point(minPoint.x, minPoint.y, minPoint.z), point(maxPoint.x, maxPoint.y, maxPoint.z));
         rtree.insert(std::make_pair(bbox, i));  // i is the identifier
     }
+
+    return MS::kSuccess;
 }
 
 
@@ -234,6 +246,10 @@ MStatus CustomMoveManip::doPress()
 {
     MStatus status = MPxManipContainer::doPress();
 
+    MString message_text = "addSelectedMObjects";
+    MGlobal::displayInfo(message_text);
+    addSelectedMObjects(selectedObjects);
+
     // Your custom code here
     MGlobal::displayInfo("Mouse pressed, object selected");
 
@@ -247,11 +263,46 @@ MStatus CustomMoveManip::doDrag()
 
     MStatus status;
     MString txt = "Moving Objects:";
-    
+    checkNearbyObjects();
     MGlobal::displayInfo(txt);
 
     return MS::kUnknownParameter;
 }
+
+void CustomMoveManip::checkNearbyObjects() {
+
+    MString txt = "checkNearbyObjects selectedObjects.size():" + selectedObjects.size();
+    MGlobal::displayInfo(txt);
+
+    for (size_t i = 0; i < selectedObjects.size(); ++i) {
+        MStatus status;
+
+        MString txt = "iteration";
+        MGlobal::displayInfo(txt);
+
+        MFnDagNode dagNode(selectedObjects[i]);
+        MBoundingBox boundingBox = dagNode.boundingBox();
+
+        // Expand the bounding box by a certain distance to find nearby objects
+        double distance = 0.1;
+        MPoint minPoint = boundingBox.min() - MVector(distance, distance, distance);
+        MPoint maxPoint = boundingBox.max() + MVector(distance, distance, distance);
+        box queryBox(point(minPoint.x, minPoint.y, minPoint.z), point(maxPoint.x, maxPoint.y, maxPoint.z));
+
+        std::vector<value> result;
+        rtree.query(bgi::intersects(queryBox), std::back_inserter(result));
+
+        for (const auto& item : result) {
+            MString txt = "iter";
+            MGlobal::displayInfo(txt);
+            if (mFnMeshes[item.second]->object() != dagNode.object()) {  // Exclude the selected mesh itself
+                MString txt = "The selected object is near another object.";
+                MGlobal::displayInfo(txt);
+            }
+        }
+    }
+}
+
 
 
 void CustomMoveManip::drawUI(MHWRender::MUIDrawManager& drawManager, const MHWRender::MFrameContext& frameContext) const
