@@ -27,6 +27,8 @@
 #include <boost/geometry.hpp>
 #include <boost/geometry/index/rtree.hpp>
 #include <vector>
+// Reactphysics3d
+#include <reactphysics3d/reactphysics3d.h>
 
 namespace bg = boost::geometry;
 namespace bgi = boost::geometry::index;
@@ -55,6 +57,7 @@ public:
     MStatus getSceneMFnMeshes();
     MStatus initializeRTree();
     void checkNearbyObjects();
+    void handleCollisions(const std::vector<MObject>& collisionCandidates);
 private:
     void updateManipLocations(const MObject& node);
 public:
@@ -227,12 +230,6 @@ MStatus CustomMoveManip::initializeRTree() {
         MPoint minPoint = mbbox.min() * worldMatrix;
         MPoint maxPoint = mbbox.max() * worldMatrix;
 
-        // Printing the min and max points of the bounding box
-        MString bboxInfo = "Bounding Box Info: \n";
-        bboxInfo += "Min Point: (" + MString() + minPoint.x + ", " + MString() + minPoint.y + ", " + MString() + minPoint.z + ")\n";
-        bboxInfo += "Max Point: (" + MString() + maxPoint.x + ", " + MString() + maxPoint.y + ", " + MString() + maxPoint.z + ")";
-        MGlobal::displayInfo(bboxInfo);
-
         box bbox(point(minPoint.x, minPoint.y, minPoint.z), point(maxPoint.x, maxPoint.y, maxPoint.z));
         rtree.insert(std::make_pair(bbox, i));  // i is the identifier
     }
@@ -273,6 +270,7 @@ MStatus CustomMoveManip::doDrag()
     // Add any additional functionality here if needed
 
     MStatus status;
+
     MString txt = "Moving Objects:";
     MGlobal::displayInfo(txt);
 
@@ -282,6 +280,12 @@ MStatus CustomMoveManip::doDrag()
 }
 
 void CustomMoveManip::checkNearbyObjects() {
+
+    if (selectedObjects.size() == 0) {
+        return;
+    }
+
+    std::vector<MObject> collisionCandidates;
 
     for (size_t i = 0; i < selectedObjects.size(); ++i) {
         MStatus status;
@@ -299,15 +303,27 @@ void CustomMoveManip::checkNearbyObjects() {
         std::vector<value> result;
         rtree.query(bgi::intersects(queryBox), std::back_inserter(result));
 
+        // collect all collided objects
         for (const auto& item : result) {
             MString txt = "iter";
             MGlobal::displayInfo(txt);
             if (mFnMeshes[item.second]->object() != dagNode.object()) {  // Exclude the selected mesh itself
                 MString txt = "The selected object is near another object.";
                 MGlobal::displayInfo(txt);
+                collisionCandidates.push_back(mFnMeshes[item.second]->object());
             }
         }
     }
+
+    if (collisionCandidates.size() != 0) {
+        handleCollisions(collisionCandidates);
+    }
+
+}
+
+void CustomMoveManip::handleCollisions(const std::vector<MObject>& collisionCandidates) {
+    // calculate collision response for each selected object with each collided one
+    MStatus status;
 }
 
 void CustomMoveManip::drawUI(MHWRender::MUIDrawManager& drawManager, const MHWRender::MFrameContext& frameContext) const
@@ -371,51 +387,53 @@ void CustomMoveManipContext::updateManipulators(void* data)
 {
     MStatus stat = MStatus::kSuccess;
 
-        CustomMoveManipContext* ctxPtr = (CustomMoveManipContext*)data;
+    CustomMoveManipContext* ctxPtr = (CustomMoveManipContext*)data;
     ctxPtr->deleteManipulators();
     MSelectionList list;
     stat = MGlobal::getActiveSelectionList(list);
     MItSelectionList iter(list, MFn::kInvalid, &stat);
-    if (MS::kSuccess == stat) {
-        for (; !iter.isDone(); iter.next()) {
-            // Make sure the selection list item is a depend node and has the
-            // required plugs before manipulating it.
+    if (MS::kSuccess != stat) {
+        return;
+    }
+
+    for (; !iter.isDone(); iter.next()) {
+        // Make sure the selection list item is a depend node and has the
+        // required plugs before manipulating it.
+        //
+        MObject dependNode;
+        iter.getDependNode(dependNode);
+        if (dependNode.isNull() || !dependNode.hasFn(MFn::kDependencyNode))
+        {
+            MGlobal::displayWarning("Object in selection list is not "
+                "a depend node.");
+            continue;
+        }
+        MFnDependencyNode dependNodeFn(dependNode);
+        MPlug rPlug = dependNodeFn.findPlug("translate", true, &stat);
+        MPlug sPlug = dependNodeFn.findPlug("scaleY", true, &stat);
+        if (rPlug.isNull() || sPlug.isNull()) {
+            MGlobal::displayWarning("Object cannot be manipulated: " +
+                dependNodeFn.name());
+            continue;
+        }
+        // Add manipulator to the selected object
+        //
+        MString manipName("customMoveManip");
+        MObject manipObject;
+        CustomMoveManip* manipulator =
+            (CustomMoveManip*)CustomMoveManip::newManipulator(manipName, manipObject);
+        if (NULL != manipulator) {
+            // Add the manipulator
             //
-            MObject dependNode;
-            iter.getDependNode(dependNode);
-            if (dependNode.isNull() || !dependNode.hasFn(MFn::kDependencyNode))
+            ctxPtr->addManipulator(manipObject);
+            // Connect the manipulator to the object in the selection list.
+            //
+            if (!manipulator->connectToDependNode(dependNode))
             {
-                MGlobal::displayWarning("Object in selection list is not "
-                    "a depend node.");
-                continue;
+                MGlobal::displayWarning("Error connecting manipulator to"
+                    " object: " + dependNodeFn.name());
             }
-            MFnDependencyNode dependNodeFn(dependNode);
-            MPlug rPlug = dependNodeFn.findPlug("translate", true, &stat);
-            MPlug sPlug = dependNodeFn.findPlug("scaleY", true, &stat);
-            if (rPlug.isNull() || sPlug.isNull()) {
-                MGlobal::displayWarning("Object cannot be manipulated: " +
-                    dependNodeFn.name());
-                continue;
-            }
-            // Add manipulator to the selected object
-            //
-            MString manipName("customMoveManip");
-            MObject manipObject;
-            CustomMoveManip* manipulator =
-                (CustomMoveManip*)CustomMoveManip::newManipulator(manipName, manipObject);
-            if (NULL != manipulator) {
-                // Add the manipulator
-                //
-                ctxPtr->addManipulator(manipObject);
-                // Connect the manipulator to the object in the selection list.
-                //
-                if (!manipulator->connectToDependNode(dependNode))
-                {
-                    MGlobal::displayWarning("Error connecting manipulator to"
-                        " object: " + dependNodeFn.name());
-                }
-                manipulator->addSelectedMObjects();
-            }
+            manipulator->addSelectedMObjects();
         }
     }
 }
