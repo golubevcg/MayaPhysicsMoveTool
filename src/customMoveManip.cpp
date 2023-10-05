@@ -19,6 +19,8 @@
 #include <maya/MItDag.h>
 #include <maya/MFnMesh.h>
 #include <maya/MBoundingBox.h>
+#include <maya/MPointArray.h>
+
 
 // Manipulators
 #include <maya/MFnFreePointTriadManip.h>
@@ -58,6 +60,7 @@ public:
     MStatus initializeRTree();
     void checkNearbyObjects();
     void handleCollisions(const std::vector<MObject>& collisionCandidates);
+    reactphysics3d::CollisionShape* createCollisionShapeFromMFnMesh(MFnMesh& fnMesh, const MDagPath& dagPath);
 private:
     void updateManipLocations(const MObject& node);
 public:
@@ -66,8 +69,11 @@ public:
     std::vector<MObject> selectedObjects;
     std::vector<MFnMesh*> mFnMeshes;
     bgi::rtree<value, bgi::quadratic<16>> rtree;
-    static MTypeId id;
 
+    reactphysics3d::PhysicsCommon physicsCommon;
+    reactphysics3d::PhysicsWorld* physicsWorld;
+
+    static MTypeId id;
 };
 MTypeId CustomMoveManip::id(0x8001d);
 
@@ -91,6 +97,18 @@ CustomMoveManip::CustomMoveManip()
     message_text = "initializeRTree";
     MGlobal::displayWarning(message_text);
     initializeRTree();
+
+    // Create a PhysicsWorld
+    reactphysics3d::PhysicsWorld::WorldSettings settings;
+    settings.isSleepingEnabled = True;
+    settings.gravity = reactphysics3d::Vector3(0, 0, 0);
+    // Create the physics world with your settings
+    reactphysics3d::PhysicsWorld* world = physicsCommon.createPhysicsWorld(
+        settings);
+
+
+
+    reactphysics3d::PhysicsWorld* physicsWorld = physicsCommon.createPhysicsWorld();
 }
 
 CustomMoveManip::~CustomMoveManip()
@@ -143,9 +161,6 @@ void CustomMoveManip::updateManipLocations(const MObject& node)
     MVector trans = m.getTranslation(MSpace::kWorld);
     manipFn.setTranslation(trans, MSpace::kWorld);
     MStatus status;
-
-    MString message_text = "after_init";
-    MGlobal::displayWarning(message_text);
 } 
 
 MStatus CustomMoveManip::addSelectedMObjects() {
@@ -326,12 +341,53 @@ void CustomMoveManip::handleCollisions(const std::vector<MObject>& collisionCand
     MStatus status;
 }
 
+reactphysics3d::CollisionShape* CustomMoveManip::createCollisionShapeFromMFnMesh(MFnMesh& fnMesh, const MDagPath& dagPath) {
+    MStatus status;
+
+    // Get vertices
+    MPointArray vertices;
+    status = fnMesh.getPoints(vertices, MSpace::kObject);
+    if (status != MStatus::kSuccess) {
+        MGlobal::displayError("Failed to get vertices");
+        return nullptr;
+    }
+
+    // Get face counts and face vertices
+    MIntArray faceCounts, faceVertices;
+    status = fnMesh.getVertices(faceCounts, faceVertices);
+    if (status != MStatus::kSuccess) {
+        MGlobal::displayError("Failed to get face vertices");
+        return nullptr;
+    }
+
+    // Apply transformation to vertices
+    MMatrix transformMatrix = dagPath.inclusiveMatrix();
+    for (unsigned int i = 0; i < vertices.length(); ++i) {
+        vertices[i] *= transformMatrix;
+    }
+
+    // TODO: Create a reactphysics3d collision shape using the transformed vertices and faces
+    // This might involve creating a ConvexMeshShape or ConcaveMeshShape depending on your needs
+    // For simplicity, let’s assume you are creating a ConvexMeshShape
+
+    // Convert MPointArray to std::vector<reactphysics3d::Vector3>
+    std::vector<reactphysics3d::Vector3> rp3dVertices;
+    for (unsigned int i = 0; i < vertices.length(); ++i) {
+        rp3dVertices.push_back(reactphysics3d::Vector3(vertices[i].x, vertices[i].y, vertices[i].z));
+    }
+
+    // Create ConvexMeshShape
+    // Note: This is a simplified example. You might need to consider the faces and indices for more complex shapes
+    reactphysics3d::ConvexMeshShape* convexMeshShape = new reactphysics3d::ConvexMeshShape(&rp3dVertices[0], vertices.length(), sizeof(reactphysics3d::Vector3));
+
+    return convexMeshShape;
+}
+
 void CustomMoveManip::drawUI(MHWRender::MUIDrawManager& drawManager, const MHWRender::MFrameContext& frameContext) const
 {
     drawManager.beginDrawable();
     drawManager.setColor(MColor(0.0f, 1.0f, 0.1f));
     drawManager.text(MPoint(0, 0), "Stretch Me!", MHWRender::MUIDrawManager::kLeft);
-
     drawManager.endDrawable();
 }
 
@@ -434,6 +490,7 @@ void CustomMoveManipContext::updateManipulators(void* data)
                     " object: " + dependNodeFn.name());
             }
             manipulator->addSelectedMObjects();
+            //update active objects in physics world
         }
     }
 }
