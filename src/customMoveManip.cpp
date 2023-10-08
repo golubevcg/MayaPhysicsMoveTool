@@ -75,14 +75,15 @@ private:
 public:
     MDagPath fFreePointManip;
     MSelectionList selList;
-    std::set<MObject> selectedObjects;
+    std::vector<MObject> selectedObjects;
     std::vector<MFnMesh*> mFnMeshes;
     bgi::rtree<value, bgi::quadratic<16>> rtree;
 
     reactphysics3d::PhysicsCommon physicsCommon;
     reactphysics3d::PhysicsWorld::WorldSettings physicsWorldSettings;
     reactphysics3d::PhysicsWorld* physicsWorld;
-    std::set<reactphysics3d::RigidBody*> activeRigidBodies;
+    std::vector<reactphysics3d::RigidBody*> activeRigidBodies;
+    reactphysics3d::RigidBody* proxyRigidBody;
 
     static MTypeId id;
 };
@@ -100,12 +101,7 @@ CustomMoveManip::CustomMoveManip()
     // Create a PhysicsWorld
     //settings.isSleepingEnabled = True;
     physicsWorldSettings.gravity = reactphysics3d::Vector3(0, 0, 0);
-
-    // Create the physics world with your settings
-    reactphysics3d::PhysicsWorld* world = physicsCommon.createPhysicsWorld(
-        physicsWorldSettings);
-
-    reactphysics3d::PhysicsWorld* physicsWorld = physicsCommon.createPhysicsWorld();
+    physicsWorld = physicsCommon.createPhysicsWorld(physicsWorldSettings);
 }
 
 CustomMoveManip::~CustomMoveManip()
@@ -188,7 +184,7 @@ void CustomMoveManip::addRigidBodyFromSelectedObject() {
         rotationMatrix[1][0] = m[1][0]; rotationMatrix[1][1] = m[1][1]; rotationMatrix[1][2] = m[1][2];
         rotationMatrix[2][0] = m[2][0]; rotationMatrix[2][1] = m[2][1]; rotationMatrix[2][2] = m[2][2];
         MTransformationMatrix tm(rotationMatrix);
-        MEulerRotation eulerRotation = tm.eulerRotation();  // Corrected this line
+        MEulerRotation eulerRotation = tm.eulerRotation();
         MQuaternion rotation = eulerRotation.asQuaternion();
 
         // Convert Maya transform to ReactPhysics3D transform
@@ -203,7 +199,28 @@ void CustomMoveManip::addRigidBodyFromSelectedObject() {
             continue;
         }
 
-        activeRigidBodies.insert(rigidBody);
+        // Create a proxy static body
+        if (proxyRigidBody != nullptr) {
+            // Remove the old rigid body
+            physicsWorld->destroyRigidBody(this->proxyRigidBody);
+            proxyRigidBody = nullptr;
+        }
+        proxyRigidBody = physicsWorld->createRigidBody(transform);
+        proxyRigidBody->setType(reactphysics3d::BodyType::STATIC);
+
+        // Create a sphere shape using PhysicsCommon
+        float radius = 0.5;  // Set an appropriate radius value
+        reactphysics3d::SphereShape* sphereShape = physicsCommon.createSphereShape(radius);
+
+        // Add the sphere shape to the proxy rigid body
+        proxyRigidBody->addCollider(sphereShape, reactphysics3d::Transform::identity());
+
+        // Create a fixed joint between the proxy and the original rigid body
+        reactphysics3d::Vector3 anchorPointWorldSpace(0, 0, 0);  // You can set this to the appropriate position
+        reactphysics3d::FixedJointInfo jointInfo(proxyRigidBody, rigidBody, anchorPointWorldSpace);
+        reactphysics3d::Joint* joint = physicsWorld->createJoint(jointInfo);
+
+        activeRigidBodies.push_back(rigidBody);
     }
 }
 
@@ -243,8 +260,10 @@ MStatus CustomMoveManip::addSelectedMObjects() {
         for (; !iter.isDone(); iter.next()) {
             MObject node;
             iter.getDependNode(node);
-            if (selectedObjects.find(node) != selectedObjects.end()) {
-                selectedObjects.insert(node);
+
+            auto it = std::find(selectedObjects.begin(), selectedObjects.end(), node);
+            if (it != selectedObjects.end()) {
+                selectedObjects.push_back(node);
             }
         }
     }
@@ -350,14 +369,38 @@ MStatus CustomMoveManip::doDrag()
 
     MStatus status;
 
-    MString txt = "Moving Objects:";
+    MString txt = "doDrag";
     MGlobal::displayInfo(txt);
 
+    /*
     std::vector<MObject> collisionCandidates = checkNearbyObjects();
     if (collisionCandidates.size() != 0) {
         std::vector<reactphysics3d::ConcaveMeshShape*> collisionsShapes = convertMFnMeshesToConcaveCollisionShapes(collisionCandidates);
         handleCollisions(collisionsShapes);
     }
+    */
+
+    // get position from manipulator
+    // update world
+    // set position to proxy object 
+    // update world 10 times
+    // with each update print position of proxy object
+    // get position of proxy object
+    // set position of the proxy object to the selected object
+    physicsWorld->update(1);
+    
+    float timeStep = 0.01f;  // Adjust this value as needed
+    int numberOfUpdates = 10;  // Update the simulation 10 times
+
+    for (int i = 0; i < numberOfUpdates; ++i) {
+        physicsWorld->update(timeStep);
+    }
+    
+
+
+    // Create a PhysicsWorld
+    //settings.isSleepingEnabled = True;
+    // Create the physics world with your settings
 
     return MS::kUnknownParameter;
 }
@@ -679,6 +722,8 @@ void CustomMoveManipContext::selectionChanged(void* data)
             ctxPtr->addManipulator(manipObject);
             // Connect the manipulator to the object in the selection list.
             //
+
+            /**/
             if (!manipulator->connectToDependNode(dependNode))
             {
                 MGlobal::displayWarning("Error connecting manipulator to"
