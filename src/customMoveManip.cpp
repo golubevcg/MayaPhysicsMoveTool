@@ -1,7 +1,9 @@
-#include <maya/MIOStream.h>
 #include <stdio.h>
 #include <vector>
 #include <stdlib.h>
+
+// Maya
+#include <maya/MIOStream.h>
 #include <maya/MFn.h>
 #include <maya/MPxNode.h>
 #include <maya/MPxManipContainer.h>
@@ -22,15 +24,14 @@
 #include <maya/MPointArray.h>
 #include <maya/MQuaternion.h>
 #include <maya/MEulerRotation.h>
-
-
-// Manipulators
 #include <maya/MFnFreePointTriadManip.h>
 #include <maya/MFnDistanceManip.h>
+
 // Boost geometry
 #include <boost/geometry.hpp>
 #include <boost/geometry/index/rtree.hpp>
 #include <vector>
+
 // Reactphysics3d
 #include <reactphysics3d/reactphysics3d.h>
 
@@ -57,7 +58,7 @@ public:
     void drawUI(MHWRender::MUIDrawManager&, const MHWRender::MFrameContext&) const override;
     MStatus doDrag() override;
     MStatus doPress() override;
-    MStatus addSelectedMObjects();
+    MStatus addSelectedMFnMesh();
     MStatus getSceneMFnMeshes();
     MStatus initializeRTree();
     std::vector<MObject> checkNearbyObjects();
@@ -138,90 +139,109 @@ MStatus CustomMoveManip::createChildren()
 }
 
 void CustomMoveManip::clearPhysicsWorld() {
+    MString warningMessage4 = "clearPhysicsWorld";
+    MGlobal::displayWarning(warningMessage4);
+
     if (this->physicsWorld != nullptr) {
         // Delete the current physics world
         this->physicsCommon.destroyPhysicsWorld(this->physicsWorld);
+    }
 
-        // Create a new physics world
-        this->physicsWorld = this->physicsCommon.createPhysicsWorld(this->physicsWorldSettings);
-    }
-    else {
-        MGlobal::displayError("Physics world is null");
-    }
+    this->physicsWorld = this->physicsCommon.createPhysicsWorld(this->physicsWorldSettings);
 } 
 
 void CustomMoveManip::addRigidBodyFromSelectedObject() {
+
+    MString warningMessage5 = "addRigidBodyFromSelectedObject";
+    MGlobal::displayWarning(warningMessage5);
 
     if (this->selectedObjects.empty()) {
         return;
     }
 
-    if (physicsWorld == nullptr) {
+    MString warningMessage6 = "addRigidBodyFromSelectedObject2";
+    MGlobal::displayWarning(warningMessage6);
+
+    if (this->physicsWorld == nullptr) {
         MGlobal::displayError("Physics world is null");
         return;
     }
 
+    MString warningMessage7 = "addRigidBodyFromSelectedObject3";
+    MGlobal::displayWarning(warningMessage7);
+
     this->activeRigidBodies.clear();
 
-    for (const auto& object : this->selectedObjects) {
+    MObject object = this->selectedObjects[0];
+
+    //for (const auto& object : this->selectedObjects) {
         // Create a collision shape from the MObject
-        reactphysics3d::ConvexMeshShape* collisionShape = createConvexCollisionShapeFromMObject(object);
-        if (collisionShape == nullptr) {
-            MGlobal::displayError("Failed to create collision shape");
-            continue;
-        }
-
-        // Get the initial transform of the object
-        MFnDagNode dagNode(object);
-        MDagPath nodePath;
-        dagNode.getPath(nodePath);
-        MMatrix m = nodePath.inclusiveMatrix();
-
-        // Extract translation from the matrix
-        MVector translation(m[3][0], m[3][1], m[3][2]);
-
-        // Extract rotation matrix and convert it to quaternion
-        MMatrix rotationMatrix;
-        rotationMatrix[0][0] = m[0][0]; rotationMatrix[0][1] = m[0][1]; rotationMatrix[0][2] = m[0][2];
-        rotationMatrix[1][0] = m[1][0]; rotationMatrix[1][1] = m[1][1]; rotationMatrix[1][2] = m[1][2];
-        rotationMatrix[2][0] = m[2][0]; rotationMatrix[2][1] = m[2][1]; rotationMatrix[2][2] = m[2][2];
-        MTransformationMatrix tm(rotationMatrix);
-        MEulerRotation eulerRotation = tm.eulerRotation();
-        MQuaternion rotation = eulerRotation.asQuaternion();
-
-        // Convert Maya transform to ReactPhysics3D transform
-        reactphysics3d::Vector3 position(translation.x, translation.y, translation.z);
-        reactphysics3d::Quaternion orientation(rotation.x, rotation.y, rotation.z, rotation.w);
-        reactphysics3d::Transform transform(position, orientation);
-
-        // Create a rigid body with the transform and collision shape
-        reactphysics3d::RigidBody* rigidBody = createRigidBody(transform, collisionShape);
-        if (rigidBody == nullptr) {
-            MGlobal::displayError("Failed to create rigid body");
-            continue;
-        }
-
-        // Remove the old rigid body
-        //physicsWorld->destroyRigidBody(this->proxyRigidBody);
-        //proxyRigidBody = nullptr;
-
-        this->proxyRigidBody = this->physicsWorld->createRigidBody(transform);
-        this->proxyRigidBody->setType(reactphysics3d::BodyType::STATIC);
-
-        // Create a sphere shape using PhysicsCommon
-        float radius = 0.5;  // Set an appropriate radius value
-        reactphysics3d::SphereShape* sphereShape = this->physicsCommon.createSphereShape(radius);
-
-        // Add the sphere shape to the proxy rigid body
-        this->proxyRigidBody->addCollider(sphereShape, reactphysics3d::Transform::identity());
-
-        // Create a fixed joint between the proxy and the original rigid body
-        reactphysics3d::Vector3 anchorPointWorldSpace(0, 0, 0);  // You can set this to the appropriate position
-        reactphysics3d::FixedJointInfo jointInfo(this->proxyRigidBody, rigidBody, anchorPointWorldSpace);
-        reactphysics3d::Joint* joint = this->physicsWorld->createJoint(jointInfo);
-
-        this->activeRigidBodies.push_back(rigidBody);
+    reactphysics3d::ConvexMeshShape* collisionShape = createConvexCollisionShapeFromMObject(object);
+    if (collisionShape == nullptr) {
+        MGlobal::displayError("Failed to create collision shape");
+        return;
     }
+
+
+    MString warningMessage8 = "addRigidBodyFromSelectedObject4";
+    MGlobal::displayWarning(warningMessage8);
+
+    // Get the initial transform of the object
+    MFnDagNode dagNode(object);
+    MDagPath nodePath;
+    dagNode.getPath(nodePath);
+    MMatrix m = nodePath.inclusiveMatrix();
+
+    // Extract translation from the matrix
+    MVector translation(m[3][0], m[3][1], m[3][2]);
+
+    // Extract rotation matrix and convert it to quaternion
+    MMatrix rotationMatrix;
+    rotationMatrix[0][0] = m[0][0]; rotationMatrix[0][1] = m[0][1]; rotationMatrix[0][2] = m[0][2];
+    rotationMatrix[1][0] = m[1][0]; rotationMatrix[1][1] = m[1][1]; rotationMatrix[1][2] = m[1][2];
+    rotationMatrix[2][0] = m[2][0]; rotationMatrix[2][1] = m[2][1]; rotationMatrix[2][2] = m[2][2];
+    MTransformationMatrix tm(rotationMatrix);
+    MEulerRotation eulerRotation = tm.eulerRotation();
+    MQuaternion rotation = eulerRotation.asQuaternion();
+
+    // Convert Maya transform to ReactPhysics3D transform
+    reactphysics3d::Vector3 position(translation.x, translation.y, translation.z);
+    reactphysics3d::Quaternion orientation(rotation.x, rotation.y, rotation.z, rotation.w);
+    reactphysics3d::Transform transform(position, orientation);
+
+    // Create a rigid body with the transform and collision shape
+    reactphysics3d::RigidBody* rigidBody = createRigidBody(transform, collisionShape);
+    if (rigidBody == nullptr) {
+        MGlobal::displayError("Failed to create rigid body");
+        return;
+    }
+
+    MString warningMessage9 = "addRigidBodyFromSelectedObject5";
+    MGlobal::displayWarning(warningMessage9);
+
+    // Remove the old rigid body
+    //physicsWorld->destroyRigidBody(this->proxyRigidBody);
+    //proxyRigidBody = nullptr;
+
+    this->proxyRigidBody = this->physicsWorld->createRigidBody(transform);
+    this->proxyRigidBody->setType(reactphysics3d::BodyType::STATIC);
+
+    // Create a sphere shape using PhysicsCommon
+    float radius = 0.5;  // Set an appropriate radius value
+    reactphysics3d::SphereShape* sphereShape = this->physicsCommon.createSphereShape(radius);
+
+    // Add the sphere shape to the proxy rigid body
+    this->proxyRigidBody->addCollider(sphereShape, reactphysics3d::Transform::identity());
+
+    // Create a fixed joint between the proxy and the original rigid body
+    reactphysics3d::Vector3 anchorPointWorldSpace(0, 0, 0);  // You can set this to the appropriate position
+    reactphysics3d::FixedJointInfo jointInfo(this->proxyRigidBody, rigidBody, anchorPointWorldSpace);
+    reactphysics3d::Joint* joint = this->physicsWorld->createJoint(jointInfo);
+
+    this->activeRigidBodies.push_back(rigidBody);
+    MString txt = "----------addRigidBodyFromSelectedObject6";
+    MGlobal::displayInfo(txt);
+    //}
 }
 
 void CustomMoveManip::updateManipLocations(const MObject& node)
@@ -244,31 +264,61 @@ void CustomMoveManip::updateManipLocations(const MObject& node)
     MStatus status;
 } 
 
-MStatus CustomMoveManip::addSelectedMObjects() {
+MStatus CustomMoveManip::addSelectedMFnMesh() {
 
-    MGlobal::getActiveSelectionList(this->selList);
-    MItSelectionList iter(this->selList);
+    MString warningMessage3 = "addSelectedMFnMesh";
+    MGlobal::displayWarning(warningMessage3);
+
+    MSelectionList selList;
+    MGlobal::getActiveSelectionList(selList);
 
     this->selectedObjects.clear();
 
-    if (iter.isDone()) {
+    if (selList.isEmpty()) {
         MString warningMessage = "No objects selected";
         MGlobal::displayWarning(warningMessage);
         return MS::kFailure;
     }
-    else {
-        for (; !iter.isDone(); iter.next()) {
-            MObject node;
-            iter.getDependNode(node);
 
-            auto it = std::find(this->selectedObjects.begin(), this->selectedObjects.end(), node);
-            if (it != this->selectedObjects.end()) {
-                this->selectedObjects.push_back(node);
+    MObject node;
+    selList.getDependNode(0, node);  // Get the first selected node
+
+    if (node.hasFn(MFn::kTransform)) {
+        MFnDagNode dagNode(node);
+        bool meshFound = false;
+
+        for (unsigned int i = 0; i < dagNode.childCount(); ++i) {
+            MObject child = dagNode.child(i);
+            if (child.hasFn(MFn::kMesh)) {
+                MFnMesh mesh(child);
+
+                MString infoMessage = "Mesh object found: " + mesh.name();
+                MGlobal::displayInfo(infoMessage);
+
+                this->selectedObjects.push_back(child);
+                meshFound = true;
+                break;
             }
         }
+
+        if (!meshFound) {
+            MString warningMessage = "No mesh found for the selected transform";
+            MGlobal::displayWarning(warningMessage);
+            return MS::kFailure;
+        }
     }
+    else {
+        MString warningMessage = "Selected object is not a transform";
+        MGlobal::displayWarning(warningMessage);
+        return MS::kFailure;
+    }
+
+    MString warningMessage4 = "Mesh object added!";
+    MGlobal::displayWarning(warningMessage4);
+
     return MS::kSuccess;
 }
+
 
 MStatus CustomMoveManip::getSceneMFnMeshes() {
     
@@ -371,20 +421,38 @@ MStatus CustomMoveManip::doDrag()
 
     float timeStep = 0.01f;  // Adjust this value as needed
     int numberOfUpdates = 10;  // Update the simulation 10 times
-
-    // 1. Retrieve the current position of the manipulator
-    MFnManip3D manipFn(this->fFreePointManip);
-    MPoint currentPosition = manipFn.translation(MSpace::kWorld);
-
-    // 2. Update the physics world
+    // 1. Update the physics world
     this->physicsWorld->update(timeStep);
 
+    // TRY TO GET TRANSLATION DIRECTLY FROM fFeePointManip because it is MDagPath
+    // 2. Retrieve the current position of the manipulator
+
+    MPoint currentPosition;
+    this->getConverterManipValue(0, currentPosition);
+
+
+    //MFnManip3D manipFn(this->fFreePointManip);
+    //MPoint currentPosition = manipFn.translation(MSpace::kWorld);
     
     // 3. Set the position of the proxy rigid body to the manipulator's position
     reactphysics3d::Vector3 newPosition(currentPosition.x, currentPosition.y, currentPosition.z);
+
+    // Log the current state for debugging
+    MString logMessage = "Setting transform for proxyRigidBody. Current manip position: ";
+    logMessage += MString() + currentPosition.x + ", " + currentPosition.y + ", " + currentPosition.z;
+    MGlobal::displayInfo(logMessage);
+
+    MString logMessage2 = "is proxyRigidBody null ptr: ";
+    if (this->proxyRigidBody == nullptr) {
+        logMessage2 += "true";
+    }
+    else {
+        logMessage2 += "false";
+    }
+    MGlobal::displayInfo(logMessage2);
+
     this->proxyRigidBody->setTransform(reactphysics3d::Transform(newPosition, this->proxyRigidBody->getTransform().getOrientation()));
 
-    /*
     // 4. Update the physics world multiple times and print the position of the proxy object after each update
     for (int i = 0; i < numberOfUpdates; ++i) {
         this->physicsWorld->update(timeStep);
@@ -402,7 +470,13 @@ MStatus CustomMoveManip::doDrag()
     if (this->proxyRigidBody != nullptr) {
         reactphysics3d::Vector3 position = this->proxyRigidBody->getTransform().getPosition();
         finalPosition = MPoint(position.x, position.y, position.z);
-    }*/
+        MString logMessage2 = "reactphysics3d::Vector3: ";
+        logMessage2 += MString() + position.x + ", " + position.y + ", " + position.z;
+        MGlobal::displayInfo(logMessage2);
+    }
+    /*
+
+    */
 
     // 6. Set this final position to the selected object
     // You need to implement this part based on how you manage your selected objects
@@ -548,7 +622,7 @@ reactphysics3d::ConvexMeshShape* CustomMoveManip::createConvexCollisionShapeFrom
         transformedVertices.push_back(static_cast<float>(transformedVertex.z));
     }
 
-    // Get polygons
+    // Get triangles
     MIntArray triangleCounts, triangleVertices;
     status = fnMesh.getTriangles(triangleCounts, triangleVertices);
     if (status != MStatus::kSuccess) {
@@ -556,39 +630,111 @@ reactphysics3d::ConvexMeshShape* CustomMoveManip::createConvexCollisionShapeFrom
         return nullptr;
     }
 
-    std::vector<int> indices;
-    for (unsigned int i = 0; i < triangleVertices.length(); ++i) {
-        indices.push_back(triangleVertices[i]);
+    // Validate that the triangleVertices is a multiple of 3
+    if (triangleVertices.length() % 3 != 0) {
+        MGlobal::displayError("triangleVertices is not a multiple of 3");
+        return nullptr;
     }
+
+    std::vector<int> indices(triangleVertices.begin(), triangleVertices.end());
 
     // Create PolygonFaces
     std::vector<reactphysics3d::PolygonVertexArray::PolygonFace> polygonFaces;
-    int indexBase = 0;
-    for (unsigned int i = 0; i < triangleCounts.length(); ++i) {
+    for (unsigned int i = 0; i < triangleVertices.length(); i += 3) {
         reactphysics3d::PolygonVertexArray::PolygonFace face;
-        face.indexBase = indexBase;
-        face.nbVertices = triangleCounts[i];  // Assuming triangleCounts contains the number of vertices per face
+        face.indexBase = i;
+        face.nbVertices = 3;  // Since we're dealing with triangles
         polygonFaces.push_back(face);
-        indexBase += triangleCounts[i];
     }
+
+    //-----
+    MString testText = "------createConvexCollisionShapeFromMObject";
+    MGlobal::displayInfo(testText);
+
+    //------------------------------------------------------
+    // Print vertices length
+    MString info = "--------Vertices Length: ";
+    info += vertices.length();
+    MGlobal::displayInfo(info);
+
+    // Print transformed vertices data
+    info = "Transformed Vertices: ";
+    for (unsigned int i = 0; i < transformedVertices.size(); i += 3) {
+        info += MString(" (") + transformedVertices[i] + ", " + transformedVertices[i + 1] + ", " + transformedVertices[i + 2] + ")";
+    }
+    MGlobal::displayInfo(info);
+
+    // Print size of float
+    MString info1 = "Vertices Length: ";
+    info1 += MString("") + 3 * sizeof(float);
+    MGlobal::displayInfo(info1);
+
+    // Print indices data
+    MString info2 = "Indices: ";
+    for (unsigned int i = 0; i < indices.size(); ++i) {
+        info2 += indices[i];
+        if (i < indices.size() - 1) {
+            info2 += ", ";
+        }
+    }
+    MGlobal::displayInfo(info2);
+
+    // Print size of int
+    MString info3 = "Size of Int: ";
+    info3 += MString("") + sizeof(int);
+    MGlobal::displayInfo(info3);
+
+    // Print polygon faces size
+    MString info4 = "Polygon Faces Size: ";
+    info4 += MString("") + polygonFaces.size();
+    MGlobal::displayInfo(info4);
+
+    // Print polygon faces data
+    MString info5 = "Polygon Faces Data: ";
+    for (const auto& face : polygonFaces) {
+        info5 += MString(" (indexBase=") + face.indexBase + ", nbVertices=" + face.nbVertices + ")";
+    }
+    MGlobal::displayInfo(info5);
+    //------------------------------------------------------
+
 
     // Create PolygonVertexArray
     auto polygonVertexArray = new reactphysics3d::PolygonVertexArray(
-        vertices.length(),
-        transformedVertices.data(),
-        3 * sizeof(float),
-        indices.data(),
-        sizeof(int),
-        polygonFaces.size(),
-        polygonFaces.data(),
+        vertices.length(), //nbVertices Number of vertices in the array
+        transformedVertices.data(), //verticesStart Pointer to the start of the vertices data
+        3 * sizeof(float), //verticesStride The number of bytes between two consecutive vertices in the array
+        indices.data(), //indexesStart    Pointer to the start of the face indices data    
+        sizeof(int), //indexesStride   The number of bytes between two consecutive face
+        polygonFaces.size(), //nbFaces The number of faces in the array
+        polygonFaces.data(), //nbFaces Pointer to the start of the faces data
         reactphysics3d::PolygonVertexArray::VertexDataType::VERTEX_FLOAT_TYPE,
-        reactphysics3d::PolygonVertexArray::IndexDataType::INDEX_INTEGER_TYPE);
+        reactphysics3d::PolygonVertexArray::IndexDataType::INDEX_INTEGER_TYPE
+    );
+
+    MString testText3 = "------polygonVertexArray";
+    if (polygonVertexArray == nullptr) {
+        testText3 += " NullPOINTER!!!!";
+    }
+    MGlobal::displayWarning(testText3);
+
+
 
     // Create PolyhedronMesh
     auto polyhedronMesh = this->physicsCommon.createPolyhedronMesh(polygonVertexArray);
+    MString testText2 = "------polyhedronMesh";
+    if (polyhedronMesh == nullptr) {
+        testText2 += " NullPOINTER!!!!";
+    }
+    MGlobal::displayWarning(testText2);
+
 
     // Create ConvexMeshShape
     auto convexMeshShape = this->physicsCommon.createConvexMeshShape(polyhedronMesh);
+    MString testText4 = "------convexMeshShape";
+    if (convexMeshShape == nullptr) {
+        testText4 += " NullPOINTER!!!!";
+    }
+    MGlobal::displayWarning(testText4);
 
     return convexMeshShape;
 }
@@ -721,7 +867,13 @@ void CustomMoveManipContext::selectionChanged(void* data)
         MString manipName("customMoveManip");
         MObject manipObject;
         CustomMoveManip* manipulator = (CustomMoveManip*)CustomMoveManip::newManipulator(manipName, manipObject);
+        MString testText1 = "NULL != manipulator";
+        MGlobal::displayInfo(testText1);
         if (NULL != manipulator) {
+
+            MString testText2 = "--INSIDE";
+            MGlobal::displayInfo(testText2);
+
             // Add the manipulator
             //
             ctxPtr->addManipulator(manipObject);
@@ -735,8 +887,11 @@ void CustomMoveManipContext::selectionChanged(void* data)
                     " object: " + dependNodeFn.name());
             }
 
+            MString testText3 = "------selectionChanged";
+            MGlobal::displayInfo(testText3);
+
             //update active objects and physics world
-            manipulator->addSelectedMObjects();
+            manipulator->addSelectedMFnMesh();
             manipulator->clearPhysicsWorld();
             manipulator->addRigidBodyFromSelectedObject();
         }
