@@ -224,7 +224,7 @@ void CustomMoveManip::addRigidBodyFromSelectedObject() {
     //proxyRigidBody = nullptr;
 
     this->proxyRigidBody = this->physicsWorld->createRigidBody(transform);
-    this->proxyRigidBody->setType(reactphysics3d::BodyType::STATIC);
+    this->proxyRigidBody->setType(reactphysics3d::BodyType::KINEMATIC);
 
     // Create a sphere shape using PhysicsCommon
     float radius = 0.5;  // Set an appropriate radius value
@@ -238,9 +238,17 @@ void CustomMoveManip::addRigidBodyFromSelectedObject() {
     reactphysics3d::FixedJointInfo jointInfo(this->proxyRigidBody, rigidBody, anchorPointWorldSpace);
     reactphysics3d::Joint* joint = this->physicsWorld->createJoint(jointInfo);
 
+    const reactphysics3d::uint32 kinematicCategory = 0x0001;
+    const reactphysics3d::uint32 defaultCategory = 0x0002;
+
+    rigidBody->getCollider(0)->setCollideWithMaskBits(defaultCategory); // Kinematic body collides with others but not with kinematic
+    this->proxyRigidBody->getCollider(0)->setCollideWithMaskBits(0xFFFF ^ kinematicCategory); // Other bodies do not collide with kinematic
+
+
     this->activeRigidBodies.push_back(rigidBody);
     MString txt = "----------addRigidBodyFromSelectedObject6";
     MGlobal::displayInfo(txt);
+
     //}
 }
 
