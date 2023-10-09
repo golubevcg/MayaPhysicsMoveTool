@@ -234,7 +234,7 @@ void CustomMoveManip::addRigidBodyFromSelectedObject() {
     this->proxyRigidBody->addCollider(sphereShape, reactphysics3d::Transform::identity());
 
     // Create a fixed joint between the proxy and the original rigid body
-    reactphysics3d::Vector3 anchorPointWorldSpace(0, 0, 0);  // You can set this to the appropriate position
+    reactphysics3d::Vector3 anchorPointWorldSpace(translation.x, translation.y, translation.z);  // You can set this to the appropriate position
     reactphysics3d::FixedJointInfo jointInfo(this->proxyRigidBody, rigidBody, anchorPointWorldSpace);
     reactphysics3d::Joint* joint = this->physicsWorld->createJoint(jointInfo);
 
@@ -451,6 +451,14 @@ MStatus CustomMoveManip::doDrag()
     }
     MGlobal::displayInfo(logMessage2);
 
+    const reactphysics3d::Transform& transform = this->activeRigidBodies[0]->getTransform();
+    // Get the position from the transform
+    const reactphysics3d::Vector3& position = transform.getPosition();
+    // Print the position to MGlobal
+    MString positionInfo = "Position of proxyRigidBody: ";
+    positionInfo += "(" + MString() + position.x + ", " + position.y + ", " + position.z + ")";
+    MGlobal::displayInfo(positionInfo);
+
     this->proxyRigidBody->setTransform(reactphysics3d::Transform(newPosition, this->proxyRigidBody->getTransform().getOrientation()));
 
     // 4. Update the physics world multiple times and print the position of the proxy object after each update
@@ -460,8 +468,8 @@ MStatus CustomMoveManip::doDrag()
         // Print the position of the proxy object for debugging
         if (this->proxyRigidBody != nullptr) {
             reactphysics3d::Vector3 position = this->proxyRigidBody->getTransform().getPosition();
-            MString positionStr = MString("Position: ") + position.x + ", " + position.y + ", " + position.z;
-            MGlobal::displayInfo(positionStr);
+            //MString positionStr = MString("Position: ") + position.x + ", " + position.y + ", " + position.z;
+            //MGlobal::displayInfo(positionStr);
         }
     }
 
@@ -474,6 +482,14 @@ MStatus CustomMoveManip::doDrag()
         logMessage2 += MString() + position.x + ", " + position.y + ", " + position.z;
         MGlobal::displayInfo(logMessage2);
     }
+
+    const reactphysics3d::Transform& transform1 = this->activeRigidBodies[0]->getTransform();
+    // Get the position from the transform
+    const reactphysics3d::Vector3& position1 = transform1.getPosition();
+    // Print the position to MGlobal
+    MString positionInfo1 = "Position of proxyRigidBody: ";
+    positionInfo1 += "(" + MString() + position1.x + ", " + position1.y + ", " + position1.z + ")";
+    MGlobal::displayInfo(positionInfo1);
     /*
 
     */
