@@ -405,7 +405,7 @@ MStatus CustomMoveManip::connectToDependNode(const MObject& node)
     MFnDependencyNode nodeFn(node);
     MPlug tPlug = nodeFn.findPlug("translate", true, &stat);
     MFnFreePointTriadManip freePointManipFn(this->fFreePointManip);
-    freePointManipFn.connectToPointPlug(tPlug);
+    //freePointManipFn.connectToPointPlug(tPlug);
     updateManipLocations(node);
     finishAddingManips();
     MPxManipContainer::connectToDependNode(node);
@@ -481,29 +481,44 @@ MStatus CustomMoveManip::doDrag()
         }
     }
 
-    // 5. Get the final position of the proxy rigid body
+    // 5. Get the final position and orientation of the proxy rigid body
     MPoint finalPosition;
+    MQuaternion finalOrientation;
     if (this->proxyRigidBody != nullptr) {
         reactphysics3d::Vector3 position = this->proxyRigidBody->getTransform().getPosition();
+        reactphysics3d::Quaternion orientation = this->proxyRigidBody->getTransform().getOrientation();
         finalPosition = MPoint(position.x, position.y, position.z);
+        finalOrientation = MQuaternion(orientation.x, orientation.y, orientation.z, orientation.w); // Convert to Maya's MQuaternion
+
         MString logMessage2 = "reactphysics3d::Vector3: ";
         logMessage2 += MString() + position.x + ", " + position.y + ", " + position.z;
         MGlobal::displayInfo(logMessage2);
     }
 
-    const reactphysics3d::Transform& transform1 = this->activeRigidBodies[0]->getTransform();
-    // Get the position from the transform
-    const reactphysics3d::Vector3& position1 = transform1.getPosition();
-    // Print the position to MGlobal
-    MString positionInfo1 = "Position of proxyRigidBody: ";
-    positionInfo1 += "(" + MString() + position1.x + ", " + position1.y + ", " + position1.z + ")";
-    MGlobal::displayInfo(positionInfo1);
-    /*
+    // ... (rest of your code remains the same)
 
-    */
+    // 6. Set this final position and orientation to the selected object
+    MDagPath dagPath;
+    MFnDagNode(selectedObjects[0]).getPath(dagPath);
+    MObject transformNode = dagPath.transform();
+    MFnTransform fnTransform(transformNode);
+    MTransformationMatrix originalTM = fnTransform.transformation();
 
-    // 6. Set this final position to the selected object
-    // You need to implement this part based on how you manage your selected objects
+    // Extract the original scale
+    double scale[3];
+    originalTM.getScale(scale, MSpace::kTransform);
+
+    // Set translation and rotation
+    MTransformationMatrix newTM;
+    MVector translation(finalPosition.x, finalPosition.y, finalPosition.z);
+    newTM.setTranslation(translation, MSpace::kTransform);
+    newTM.setRotationQuaternion(finalOrientation.x, finalOrientation.y, finalOrientation.z, finalOrientation.w);
+    // Apply the original scale
+    newTM.setScale(scale, MSpace::kTransform);
+
+    // Apply the new transformation matrix to the transform node
+    fnTransform.set(newTM.asMatrix());
+
 
     return MS::kUnknownParameter;
 }
