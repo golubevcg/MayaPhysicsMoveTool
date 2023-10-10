@@ -252,26 +252,6 @@ void CustomMoveManip::addRigidBodyFromSelectedObject() {
     //}
 }
 
-void CustomMoveManip::updateManipLocations(const MObject& node)
-//
-// Description
-//        setTranslation and setRotation to the parent's transformation.
-//
-{
-    MFnDagNode dagNodeFn(node);
-    MDagPath nodePath;
-    dagNodeFn.getPath(nodePath);
-    MFnFreePointTriadManip manipFn(this->fFreePointManip);
-    MTransformationMatrix m(nodePath.exclusiveMatrix());
-    double rot[3];
-    MTransformationMatrix::RotationOrder rOrder;
-    m.getRotation(rot, rOrder);
-    manipFn.setRotation(rot, rOrder);
-    MVector trans = m.getTranslation(MSpace::kWorld);
-    manipFn.setTranslation(trans, MSpace::kWorld);
-    MStatus status;
-} 
-
 MStatus CustomMoveManip::addSelectedMFnMesh() {
 
     MString warningMessage3 = "addSelectedMFnMesh";
@@ -326,7 +306,6 @@ MStatus CustomMoveManip::addSelectedMFnMesh() {
 
     return MS::kSuccess;
 }
-
 
 MStatus CustomMoveManip::getSceneMFnMeshes() {
     
@@ -406,12 +385,37 @@ MStatus CustomMoveManip::connectToDependNode(const MObject& node)
     MPlug tPlug = nodeFn.findPlug("translate", true, &stat);
     MFnFreePointTriadManip freePointManipFn(this->fFreePointManip);
     //freePointManipFn.connectToPointPlug(tPlug);
-    updateManipLocations(node);
-    finishAddingManips();
+    this->updateManipLocations(node);
+    this->finishAddingManips();
     MPxManipContainer::connectToDependNode(node);
     return stat;
 }
 // Viewport 2.0 manipulator draw overrides
+
+void CustomMoveManip::updateManipLocations(const MObject& node)
+//
+// Description
+//        setTranslation and setRotation to the parent's transformation.
+//
+{
+    MFnFreePointTriadManip manipFn(this->fFreePointManip);
+
+    MDagPath dagPath;
+    MFnDagNode(node).getPath(dagPath);
+
+    MObject transformNode = dagPath.transform();
+    MFnTransform fnTransform(transformNode);
+    MTransformationMatrix originalTM = fnTransform.transformation();
+
+    double rot[3];
+    MTransformationMatrix::RotationOrder rOrder;
+    originalTM.getRotation(rot, rOrder);
+
+    manipFn.setRotation(rot, rOrder);
+    manipFn.setTranslation(originalTM.getTranslation(MSpace::kTransform), MSpace::kTransform);
+
+    MStatus status;
+}
 
 MStatus CustomMoveManip::doPress()
 {
@@ -434,20 +438,19 @@ MStatus CustomMoveManip::doDrag()
 
     // TRY TO GET TRANSLATION DIRECTLY FROM fFeePointManip because it is MDagPath
     // 2. Retrieve the current position of the manipulator
+    MFnManip3D manipFn(this->fFreePointManip);
 
     MPoint currentPosition;
     this->getConverterManipValue(0, currentPosition);
 
+    MPoint currentTranslation = manipFn.translation(MSpace::kWorld);
 
-    //MFnManip3D manipFn(this->fFreePointManip);
-    //MPoint currentPosition = manipFn.translation(MSpace::kWorld);
-    
     // 3. Set the position of the proxy rigid body to the manipulator's position
-    reactphysics3d::Vector3 newPosition(currentPosition.x, currentPosition.y, currentPosition.z);
+    reactphysics3d::Vector3 newPosition(currentPosition.x + currentTranslation.x, currentPosition.y + currentTranslation.y, currentPosition.z + currentTranslation.z);
 
     // Log the current state for debugging
     MString logMessage = "Setting transform for proxyRigidBody. Current manip position: ";
-    logMessage += MString() + currentPosition.x + ", " + currentPosition.y + ", " + currentPosition.z;
+    logMessage += MString() + currentPosition.x + currentTranslation.x + ", " + currentPosition.y + currentTranslation.y + ", " + currentPosition.z + currentTranslation.z;
     MGlobal::displayInfo(logMessage);
 
     MString logMessage2 = "is proxyRigidBody null ptr: ";
@@ -506,23 +509,21 @@ MStatus CustomMoveManip::doDrag()
 
     // Extract the original scale
     double scale[3];
-    originalTM.getScale(scale, MSpace::kTransform);
+    originalTM.getScale(scale, MSpace::kWorld);
 
     // Set translation and rotation
     MTransformationMatrix newTM;
     MVector translation(finalPosition.x, finalPosition.y, finalPosition.z);
-    newTM.setTranslation(translation, MSpace::kTransform);
+    newTM.setTranslation(translation, MSpace::kWorld);
     newTM.setRotationQuaternion(finalOrientation.x, finalOrientation.y, finalOrientation.z, finalOrientation.w);
     // Apply the original scale
-    newTM.setScale(scale, MSpace::kTransform);
+    newTM.setScale(scale, MSpace::kWorld);
 
     // Apply the new transformation matrix to the transform node
     fnTransform.set(newTM.asMatrix());
 
-
     return MS::kUnknownParameter;
 }
-
 
 std::vector<MObject> CustomMoveManip::checkNearbyObjects() {
 
