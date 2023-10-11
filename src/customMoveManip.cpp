@@ -233,8 +233,8 @@ void CustomMoveManip::addRigidBodyFromSelectedObject() {
     const reactphysics3d::uint32 kinematicCategory = 0x0001;
     const reactphysics3d::uint32 defaultCategory = 0x0002;
 
-    rigidBody->getCollider(0)->setCollideWithMaskBits(defaultCategory); // Kinematic body collides with others but not with kinematic
-    this->proxyRigidBody->getCollider(0)->setCollideWithMaskBits(0xFFFF ^ kinematicCategory); // Other bodies do not collide with kinematic
+    //rigidBody->getCollider(0)->setCollideWithMaskBits(defaultCategory); // Kinematic body collides with others but not with kinematic
+    //this->proxyRigidBody->getCollider(0)->setCollideWithMaskBits(0xFFFF ^ kinematicCategory); // Other bodies do not collide with kinematic
 
 
     this->activeRigidBodies.push_back(rigidBody);
@@ -452,7 +452,6 @@ MStatus CustomMoveManip::doDrag()
     // 3. Set the position of the proxy rigid body to the manipulator's position
     reactphysics3d::Vector3 newPosition(currentPosition.x + currentTranslation.x, currentPosition.y + currentTranslation.y, currentPosition.z + currentTranslation.z);
 
-    /*
     // Log the current state for debugging
     MString logMessage = "Setting transform for proxyRigidBody. Current manip position: ";
     logMessage += MString() + currentPosition.x + currentTranslation.x + ", " + currentPosition.y + currentTranslation.y + ", " + currentPosition.z + currentTranslation.z;
@@ -466,7 +465,6 @@ MStatus CustomMoveManip::doDrag()
         logMessage2 += "false";
     }
     MGlobal::displayInfo(logMessage2);
-    */
 
     const reactphysics3d::Transform& transform = this->activeRigidBodies[0]->getTransform();
     // Get the position from the transform
@@ -487,7 +485,8 @@ MStatus CustomMoveManip::doDrag()
     // 4. Update the physics world multiple times and print the position of the proxy object after each update
     for (int i = 0; i < numberOfUpdates; ++i) {
         this->physicsWorld->update(timeStep);
-
+        MString txt55 = "UPDATE";
+        MGlobal::displayInfo(txt55);
         // Print the position of the proxy object for debugging
         if (this->proxyRigidBody != nullptr) {
             reactphysics3d::Vector3 position = this->proxyRigidBody->getTransform().getPosition();
@@ -545,32 +544,47 @@ std::vector<MObject> CustomMoveManip::checkNearbyObjects() {
         return collisionCandidates;
     }
 
-
     for (const auto& currentMObject : this->selectedMFnMeshes) {
         MStatus status;
 
         MFnDagNode dagNode(currentMObject);
+        MDagPath dagPath;
+        MDagPath::getAPathTo(currentMObject, dagPath);
+        MFnTransform transform(dagPath.transform(), &status);
+        if (status != MStatus::kSuccess) {
+            // Handle error
+            return collisionCandidates;
+        }
+        MMatrix worldMatrix = transform.transformationMatrix();
+
         MBoundingBox boundingBox = dagNode.boundingBox();
+        MPoint worldMinPoint = boundingBox.min() * worldMatrix;
+        MPoint worldMaxPoint = boundingBox.max() * worldMatrix;
 
         // Expand the bounding box by a certain distance to find nearby objects
         double distance = 0.1;
-        MPoint minPoint = boundingBox.min() - MVector(distance, distance, distance);
-        MPoint maxPoint = boundingBox.max() + MVector(distance, distance, distance);
-        
-        box queryBox(point(minPoint.x, minPoint.y, minPoint.z), point(maxPoint.x, maxPoint.y, maxPoint.z));
+        worldMinPoint -= MVector(distance, distance, distance);
+        worldMaxPoint += MVector(distance, distance, distance);
+
+        box queryBox(point(worldMinPoint.x, worldMinPoint.y, worldMinPoint.z),
+            point(worldMaxPoint.x, worldMaxPoint.y, worldMaxPoint.z));
 
         std::vector<value> result;
         this->rtree.query(bgi::intersects(queryBox), std::back_inserter(result));
 
         // collect all collided objects
         for (const auto& item : result) {
-            //MString txt = "iter";
-            //MGlobal::displayInfo(txt);
             // TODO:CHANGE THIS TO CONDITION CHECK THAT DAG MOBJECT ALREADY IN THE LIST
-            if (this->mFnMeshes[item.second]->object() != dagNode.object()) {  // Exclude the selected mesh itself
+            if (this->mFnMeshes[item.second]->object() != currentMObject) {  // Exclude the selected mesh itself
+                MFnDagNode dagNode1(this->mFnMeshes[item.second]->object());
+                MString rtree = "added mobject from RTREE" + MString() + dagNode1.fullPathName() + MString() + worldMinPoint.x + worldMinPoint.y + worldMinPoint.z;
+                MGlobal::displayInfo(rtree);
+                                                                             
                 //MString txt = "The selected object is near another object.";
                 //MGlobal::displayInfo(txt);
                 collisionCandidates.push_back(this->mFnMeshes[item.second]->object());
+                MString txt11 = "Added object to collision candidates";
+                MGlobal::displayInfo(txt11);
             }
         }
     }
@@ -757,11 +771,11 @@ reactphysics3d::ConcaveMeshShape* CustomMoveManip::createConcaveCollisionShapeFr
         reactphysics3d::Quaternion orientation(rotation.x, rotation.y, rotation.z, rotation.w);
         reactphysics3d::Transform transform(position, orientation);
 
-        reactphysics3d::RigidBody* rigidBody = physicsWorld->createRigidBody(transform);
-        rigidBody->setType(reactphysics3d::BodyType::STATIC);
+        reactphysics3d::RigidBody* colliderRigidBody = physicsWorld->createRigidBody(transform);
+        colliderRigidBody->setType(reactphysics3d::BodyType::STATIC);
 
         // Attach the concave mesh shape to the rigid body
-        rigidBody->addCollider(concaveMeshShape, reactphysics3d::Transform::identity());
+        colliderRigidBody->addCollider(concaveMeshShape, reactphysics3d::Transform::identity());
 
         // Now the static rigid body with the attached collision shape is part of the physics world
     }
