@@ -65,6 +65,7 @@ public:
     void handleCollisions(std::vector<reactphysics3d::ConcaveMeshShape*>);
     // for rigid bodies
     reactphysics3d::ConvexMeshShape* CustomMoveManip::createConvexCollisionShapeFromMObject(const MObject& object);
+    reactphysics3d::ConcaveMeshShape* CustomMoveManip::createConcaveCollisionShapeFromMObject(const MObject& object);
     reactphysics3d::RigidBody* CustomMoveManip::createRigidBody(const reactphysics3d::Transform& transform, reactphysics3d::CollisionShape* collisionShape);
     void clearPhysicsWorld();
     void addRigidBodyFromSelectedObject();
@@ -599,16 +600,13 @@ void CustomMoveManip::createCollidersFromMObjects(std::vector<MObject> meshes) {
     //PROBABLY U NEED TO CHECK THAT SELECTED OBJECT IS NOT IN THE LIST OF COLLISION CANDIDATES
 
     for (size_t i = 0; i < meshes.size(); ++i) {
-        MString txt1 = "before createColliderFromMObject";
-        MGlobal::displayInfo(txt1);
-
         if (meshes[i] == this->selectedMFnMeshes[0]) {
             continue;
         }
-        this->createColliderFromMObject(meshes[i]);
+        this->createConcaveCollisionShapeFromMObject(meshes[i]);
         //reactphysics3d::CollisionBody* collider = this->createColliderFromMObject(meshes[i]);
         //this->colliders.push_back(collider);
-        MString txt2 = "after createColliderFromMObject";
+        MString txt2 = "created ConcaveCollider for mObject";
         MGlobal::displayInfo(txt2);
     }
 }
@@ -624,8 +622,8 @@ void CustomMoveManip::createColliderFromMObject(MObject object) {
 
     MString txt2 = "createColliderFromMObject2";
     MGlobal::displayWarning(txt2);
-
     reactphysics3d::ConvexMeshShape* collisionShape = createConvexCollisionShapeFromMObject(object);
+
     if (collisionShape == nullptr) {
         MGlobal::displayError("Failed to create collision shape");
         //return nullptr;
@@ -665,8 +663,110 @@ void CustomMoveManip::createColliderFromMObject(MObject object) {
 
     // Add the collision shape as a collider to the collision body
     collisionBody->addCollider(collisionShape, reactphysics3d::Transform::identity());
-
+    if (collisionBody->getCollider(0) == nullptr) {
+        MGlobal::displayError("Failed to add collider to collision body");
+        //return nullptr;
+    }
     //return collisionBody;
+}
+
+reactphysics3d::ConcaveMeshShape* CustomMoveManip::createConcaveCollisionShapeFromMObject(const MObject& object) {
+    MStatus status;
+    MDagPath dagPath;
+    MFnDagNode(object).getPath(dagPath);
+    MFnMesh fnMesh(object, &status);
+
+    // Get vertices
+    MPointArray vertices;
+    status = fnMesh.getPoints(vertices, MSpace::kObject);
+    if (status != MStatus::kSuccess) {
+        MGlobal::displayError("Failed to get vertices");
+        return nullptr;
+    }
+
+    // Apply transformation to vertices
+    MMatrix transformMatrix = dagPath.inclusiveMatrix();
+    std::vector<float> transformedVertices;
+    for (unsigned int i = 0; i < vertices.length(); ++i) {
+        //MPoint transformedVertex = vertices[i] * transformMatrix;
+        MPoint transformedVertex = vertices[i];
+        transformedVertices.push_back(static_cast<float>(transformedVertex.x));
+        transformedVertices.push_back(static_cast<float>(transformedVertex.y));
+        transformedVertices.push_back(static_cast<float>(transformedVertex.z));
+    }
+
+    // Get triangles
+    MIntArray triangleCounts, triangleVertices;
+    status = fnMesh.getTriangles(triangleCounts, triangleVertices);
+    if (status != MStatus::kSuccess) {
+        MGlobal::displayError("Failed to get triangles");
+        return nullptr;
+    }
+
+    // Validate that the triangleVertices is a multiple of 3
+    if (triangleVertices.length() % 3 != 0) {
+        MGlobal::displayError("triangleVertices is not a multiple of 3");
+        return nullptr;
+    }
+
+    // Convert MIntArray to std::vector<int>
+    std::vector<int> triangleVerticesVector(triangleVertices.begin(), triangleVertices.end());
+
+    // Create TriangleVertexArray
+    auto triangleVertexArray = new reactphysics3d::TriangleVertexArray(
+        vertices.length(),
+        transformedVertices.data(),
+        3 * sizeof(float),
+        triangleVerticesVector.size() / 3,
+        triangleVerticesVector.data(),
+        3 * sizeof(int),
+        reactphysics3d::TriangleVertexArray::VertexDataType::VERTEX_FLOAT_TYPE,
+        reactphysics3d::TriangleVertexArray::IndexDataType::INDEX_INTEGER_TYPE
+    );
+
+    // Create TriangleMesh and add the TriangleVertexArray as a subpart
+    auto triangleMesh = this->physicsCommon.createTriangleMesh();
+    triangleMesh->addSubpart(triangleVertexArray);
+
+    // Create ConcaveMeshShape
+    auto concaveMeshShape = this->physicsCommon.createConcaveMeshShape(triangleMesh);
+    MString testText4 = "------concaveMeshShape";
+    if (concaveMeshShape == nullptr) {
+        testText4 += " NullPOINTER!!!!";
+    }
+    MGlobal::displayWarning(testText4);
+
+    if (concaveMeshShape != nullptr) {
+        // Create a static rigid body (mass = 0)
+        MMatrix m = dagPath.inclusiveMatrix();
+
+        // Extract translation from the matrix
+        MVector translation(m[3][0], m[3][1], m[3][2]);
+
+        // Extract rotation matrix and convert it to quaternion
+        MMatrix rotationMatrix;
+        rotationMatrix[0][0] = m[0][0]; rotationMatrix[0][1] = m[0][1]; rotationMatrix[0][2] = m[0][2];
+        rotationMatrix[1][0] = m[1][0]; rotationMatrix[1][1] = m[1][1]; rotationMatrix[1][2] = m[1][2];
+        rotationMatrix[2][0] = m[2][0]; rotationMatrix[2][1] = m[2][1]; rotationMatrix[2][2] = m[2][2];
+        MTransformationMatrix tm(rotationMatrix);
+        MEulerRotation eulerRotation = tm.eulerRotation();
+        MQuaternion rotation = eulerRotation.asQuaternion();
+
+        // Convert Maya transform to ReactPhysics3D transform
+        reactphysics3d::Vector3 position(translation.x, translation.y, translation.z);
+        reactphysics3d::Quaternion orientation(rotation.x, rotation.y, rotation.z, rotation.w);
+        reactphysics3d::Transform transform(position, orientation);
+
+        reactphysics3d::RigidBody* rigidBody = physicsWorld->createRigidBody(transform);
+        rigidBody->setType(reactphysics3d::BodyType::STATIC);
+
+        // Attach the concave mesh shape to the rigid body
+        rigidBody->addCollider(concaveMeshShape, reactphysics3d::Transform::identity());
+
+        // Now the static rigid body with the attached collision shape is part of the physics world
+    }
+
+    return concaveMeshShape;
 }
 
 reactphysics3d::ConvexMeshShape* CustomMoveManip::createConvexCollisionShapeFromMObject(const MObject& object) {
