@@ -26,6 +26,9 @@
 #include <maya/MEulerRotation.h>
 #include <maya/MFnFreePointTriadManip.h>
 #include <maya/MFnDistanceManip.h>
+#include <maya/MFnPlugin.h>
+
+#include <cstdint>
 
 // Boost geometry
 #include <boost/geometry.hpp>
@@ -65,10 +68,10 @@ public:
     void handleCollisions(std::vector<reactphysics3d::ConcaveMeshShape*>);
     // for rigid bodies
     reactphysics3d::ConvexMeshShape* CustomMoveManip::createConvexCollisionShapeFromMObject(const MObject& object);
-    reactphysics3d::ConcaveMeshShape* CustomMoveManip::createConcaveCollisionShapeFromMObject(const MObject& object);
+    reactphysics3d::CollisionBody* CustomMoveManip::createConcaveCollisionShapeFromMObject(const MObject& object);
     reactphysics3d::RigidBody* CustomMoveManip::createRigidBody(const reactphysics3d::Transform& transform, reactphysics3d::CollisionShape* collisionShape);
     void clearPhysicsWorld();
-    void addRigidBodyFromSelectedObject();
+    void createRigidBodyFromSelectedObject();
     // for static colliders
     void CustomMoveManip::createColliderFromMObject(MObject object);
     void createCollidersFromMObjects(std::vector<MObject>);
@@ -86,6 +89,8 @@ public:
     reactphysics3d::PhysicsWorld::WorldSettings physicsWorldSettings;
     reactphysics3d::PhysicsWorld* physicsWorld;
     std::vector<reactphysics3d::RigidBody*> activeRigidBodies;
+    reactphysics3d::RigidBody* activeRigidBody;
+
     reactphysics3d::RigidBody* proxyRigidBody;
     std::vector<reactphysics3d::CollisionBody*> colliders;
 
@@ -102,6 +107,10 @@ CustomMoveManip::CustomMoveManip()
     //settings.isSleepingEnabled = True;
     this->physicsWorldSettings.gravity = reactphysics3d::Vector3(0, 0, 0);
     this->physicsWorld = this->physicsCommon.createPhysicsWorld(this->physicsWorldSettings);
+
+    // TODO:DISABLE THIS LATER
+    this->physicsWorld->enableSleeping(false);
+
 
     this->getSceneMFnMeshes();
     this->initializeRTree();
@@ -152,7 +161,7 @@ void CustomMoveManip::clearPhysicsWorld() {
     this->physicsWorld = this->physicsCommon.createPhysicsWorld(this->physicsWorldSettings);
 } 
 
-void CustomMoveManip::addRigidBodyFromSelectedObject() {
+void CustomMoveManip::createRigidBodyFromSelectedObject() {
 
     if (this->selectedMFnMeshes.empty()) {
         return;
@@ -182,7 +191,11 @@ void CustomMoveManip::addRigidBodyFromSelectedObject() {
     MFnDagNode dagNode(object);
     MDagPath nodePath;
     dagNode.getPath(nodePath);
-    MMatrix m = nodePath.inclusiveMatrix();
+
+    MDagPath transformDagPath = nodePath;
+    transformDagPath.pop();
+
+    MMatrix m = transformDagPath.inclusiveMatrix();
 
     // Extract translation from the matrix
     MVector translation(m[3][0], m[3][1], m[3][2]);
@@ -226,18 +239,27 @@ void CustomMoveManip::addRigidBodyFromSelectedObject() {
     this->proxyRigidBody->addCollider(sphereShape, reactphysics3d::Transform::identity());
 
     // Create a fixed joint between the proxy and the original rigid body
+    
     reactphysics3d::Vector3 anchorPointWorldSpace(translation.x, translation.y, translation.z);  // You can set this to the appropriate position
     reactphysics3d::FixedJointInfo jointInfo(this->proxyRigidBody, rigidBody, anchorPointWorldSpace);
     reactphysics3d::Joint* joint = this->physicsWorld->createJoint(jointInfo);
 
+    /*
+    // Force vector (in Newton )
+    reactphysics3d::Vector3 force(10.0, 0.0, 0.0);
+    // Apply a force to the center of the body
+    rigidBody->applyWorldForceAtCenterOfMass(force);
+    */
+
     const reactphysics3d::uint32 kinematicCategory = 0x0001;
     const reactphysics3d::uint32 defaultCategory = 0x0002;
 
-    //rigidBody->getCollider(0)->setCollideWithMaskBits(defaultCategory); // Kinematic body collides with others but not with kinematic
-    //this->proxyRigidBody->getCollider(0)->setCollideWithMaskBits(0xFFFF ^ kinematicCategory); // Other bodies do not collide with kinematic
+    rigidBody->getCollider(0)->setCollideWithMaskBits(defaultCategory); // Kinematic body collides with others but not with kinematic
+    this->proxyRigidBody->getCollider(0)->setCollideWithMaskBits(0xFFFF ^ kinematicCategory); // Other bodies do not collide with kinematic
 
 
     this->activeRigidBodies.push_back(rigidBody);
+    this->activeRigidBody = rigidBody;
     MString txt = "----------addRigidBodyFromSelectedObject6";
     MGlobal::displayInfo(txt);
 }
@@ -450,7 +472,11 @@ MStatus CustomMoveManip::doDrag()
     MPoint currentTranslation = manipFn.translation(MSpace::kWorld);
 
     // 3. Set the position of the proxy rigid body to the manipulator's position
-    reactphysics3d::Vector3 newPosition(currentPosition.x + currentTranslation.x, currentPosition.y + currentTranslation.y, currentPosition.z + currentTranslation.z);
+    reactphysics3d::Vector3 newPosition(
+        currentPosition.x + currentTranslation.x, 
+        currentPosition.y + currentTranslation.y, 
+        currentPosition.z + currentTranslation.z
+    );
 
     // Log the current state for debugging
     MString logMessage = "Setting transform for proxyRigidBody. Current manip position: ";
@@ -464,9 +490,9 @@ MStatus CustomMoveManip::doDrag()
     else {
         logMessage2 += "false";
     }
-    MGlobal::displayInfo(logMessage2);
+    MGlobal::displayInfo(logMessage2); 
 
-    const reactphysics3d::Transform& transform = this->activeRigidBodies[0]->getTransform();
+    const reactphysics3d::Transform& transform = this->activeRigidBody->getTransform();
     // Get the position from the transform
     const reactphysics3d::Vector3& position = transform.getPosition();
     /*
@@ -493,21 +519,57 @@ MStatus CustomMoveManip::doDrag()
             //MString positionStr = MString("Position: ") + position.x + ", " + position.y + ", " + position.z;
             //MGlobal::displayInfo(positionStr);
         }
+
+        MGlobal::displayInfo(MString(" "));
+        MGlobal::displayInfo(MString(" "));
+
+
+        // Corrected code to print all colliders and their mesh info in the physics world
+        uint32_t numRigidBodies = this->physicsWorld->getNbRigidBodies();  // Changed uint32 to uint32_t
+        for (uint32_t j = 0; j < numRigidBodies; ++j) {  // Changed uint32 to uint32_t
+            reactphysics3d::RigidBody* rigidBody = this->physicsWorld->getRigidBody(j);
+            const auto& transform = rigidBody->getTransform();
+            const auto& position = transform.getPosition();
+            MString rigidBodyInfo = MString("RigidBody Position: ") + position.x + ", " + position.y + ", " + position.z;
+            MGlobal::displayInfo(rigidBodyInfo);
+
+            // Since direct access to colliders is not provided, we can display the AABB as the info
+            const auto& aabb = this->physicsWorld->getWorldAABB(rigidBody->getCollider(0)); // Assuming single collider for simplicity
+            MString aabbInfo = "AABB Min: (" + MString() + aabb.getMin().x + ", " + aabb.getMin().y + ", " + aabb.getMin().z + ")";
+            aabbInfo += " Max: (" + MString() + aabb.getMax().x + ", " + aabb.getMax().y + ", " + aabb.getMax().z + ")";
+            MGlobal::displayInfo(aabbInfo);
+        }
+
+        // Print collision bodies information
+        uint32_t numCollisionBodies = this->physicsWorld->getNbCollisionBodies();
+        for (uint32_t i = 0; i < numCollisionBodies; ++i) {
+            reactphysics3d::CollisionBody* collisionBody = this->physicsWorld->getCollisionBody(i);
+            const auto& transform = collisionBody->getTransform();
+            const auto& position = transform.getPosition();
+            MString collisionBodyInfo = "CollisionBody Position: " + MString() + position.x + ", " + position.y + ", " + position.z;
+            MGlobal::displayInfo(collisionBodyInfo);
+
+            // Print AABB info if applicable
+            // (Modify this part according to how you want to display collision body info)
+            const auto& aabb = this->physicsWorld->getWorldAABB(collisionBody->getCollider(0));  // Modify if needed
+            MString aabbInfo = "CollisionBody AABB Min: (" + MString() + aabb.getMin().x + ", " + aabb.getMin().y + ", " + aabb.getMin().z + ")";
+            aabbInfo += " Max: (" + MString() + aabb.getMax().x + ", " + aabb.getMax().y + ", " + aabb.getMax().z + ")";
+            MGlobal::displayInfo(aabbInfo);
+        }
+
     }
 
     // 5. Get the final position and orientation of the proxy rigid body
     MPoint finalPosition;
     MQuaternion finalOrientation;
-    if (this->proxyRigidBody != nullptr) {
-        reactphysics3d::Vector3 position = this->proxyRigidBody->getTransform().getPosition();
-        reactphysics3d::Quaternion orientation = this->proxyRigidBody->getTransform().getOrientation();
+    if (this->activeRigidBody != nullptr) {
+        reactphysics3d::Vector3 position = this->activeRigidBody->getTransform().getPosition();
+        reactphysics3d::Quaternion orientation = this->activeRigidBody->getTransform().getOrientation();
         finalPosition = MPoint(position.x, position.y, position.z);
         finalOrientation = MQuaternion(orientation.x, orientation.y, orientation.z, orientation.w); // Convert to Maya's MQuaternion
-        /*
-        MString logMessage2 = "reactphysics3d::Vector3: ";
+        MString logMessage2 = "RIGID BODY POS reactphysics3d::Vector3: ";
         logMessage2 += MString() + position.x + ", " + position.y + ", " + position.z;
         MGlobal::displayInfo(logMessage2);
-        */
     }
 
     // ... (rest of your code remains the same)
@@ -612,14 +674,24 @@ void CustomMoveManip::createCollidersFromMObjects(std::vector<MObject> meshes) {
     // CLEANUP MESHES
 
     //PROBABLY U NEED TO CHECK THAT SELECTED OBJECT IS NOT IN THE LIST OF COLLISION CANDIDATES
+    if (!this->colliders.empty()) {
+        for (auto& collider : this->colliders) {
+            // Assuming `destroyRigidBody` is the method to remove a rigid body from the physics world
+            // Replace this with the actual method if different
+            this->physicsWorld->destroyCollisionBody(collider);
+        }
+        this->colliders.clear();
+    }
 
     for (size_t i = 0; i < meshes.size(); ++i) {
         if (meshes[i] == this->selectedMFnMeshes[0]) {
             continue;
         }
-        this->createConcaveCollisionShapeFromMObject(meshes[i]);
+        reactphysics3d::CollisionBody* colliderRigidBody = this->createConcaveCollisionShapeFromMObject(meshes[i]);
         //reactphysics3d::CollisionBody* collider = this->createColliderFromMObject(meshes[i]);
         //this->colliders.push_back(collider);
+        this->colliders.push_back(colliderRigidBody);
+
         MString txt2 = "created ConcaveCollider for mObject";
         MGlobal::displayInfo(txt2);
     }
@@ -648,7 +720,10 @@ void CustomMoveManip::createColliderFromMObject(MObject object) {
     MFnDagNode dagNode(object);
     MDagPath nodePath;
     dagNode.getPath(nodePath);
-    MMatrix m = nodePath.inclusiveMatrix();
+
+    MDagPath transformDagPath = nodePath;
+    transformDagPath.pop();
+    MMatrix m = transformDagPath.inclusiveMatrix();
 
     MVector translation(m[3][0], m[3][1], m[3][2]);
 
@@ -684,11 +759,14 @@ void CustomMoveManip::createColliderFromMObject(MObject object) {
     //return collisionBody;
 }
 
-reactphysics3d::ConcaveMeshShape* CustomMoveManip::createConcaveCollisionShapeFromMObject(const MObject& object) {
+reactphysics3d::CollisionBody* CustomMoveManip::createConcaveCollisionShapeFromMObject(const MObject& object) {
     MStatus status;
     MDagPath dagPath;
     MFnDagNode(object).getPath(dagPath);
     MFnMesh fnMesh(object, &status);
+
+    MString name = "creating ConcaveColl for object:" + MString() + dagPath.fullPathName();
+    MGlobal::displayWarning(name);
 
     // Get vertices
     MPointArray vertices;
@@ -696,17 +774,6 @@ reactphysics3d::ConcaveMeshShape* CustomMoveManip::createConcaveCollisionShapeFr
     if (status != MStatus::kSuccess) {
         MGlobal::displayError("Failed to get vertices");
         return nullptr;
-    }
-
-    // Apply transformation to vertices
-    MMatrix transformMatrix = dagPath.inclusiveMatrix();
-    std::vector<float> transformedVertices;
-    for (unsigned int i = 0; i < vertices.length(); ++i) {
-        //MPoint transformedVertex = vertices[i] * transformMatrix;
-        MPoint transformedVertex = vertices[i];
-        transformedVertices.push_back(static_cast<float>(transformedVertex.x));
-        transformedVertices.push_back(static_cast<float>(transformedVertex.y));
-        transformedVertices.push_back(static_cast<float>(transformedVertex.z));
     }
 
     // Get triangles
@@ -726,10 +793,18 @@ reactphysics3d::ConcaveMeshShape* CustomMoveManip::createConcaveCollisionShapeFr
     // Convert MIntArray to std::vector<int>
     std::vector<int> triangleVerticesVector(triangleVertices.begin(), triangleVertices.end());
 
+    // Convert vertices to std::vector<float>
+    std::vector<float> verticesVector;
+    for (unsigned int i = 0; i < vertices.length(); ++i) {
+        verticesVector.push_back(static_cast<float>(vertices[i].x));
+        verticesVector.push_back(static_cast<float>(vertices[i].y));
+        verticesVector.push_back(static_cast<float>(vertices[i].z));
+    }
+
     // Create TriangleVertexArray
     auto triangleVertexArray = new reactphysics3d::TriangleVertexArray(
         vertices.length(),
-        transformedVertices.data(),
+        verticesVector.data(),
         3 * sizeof(float),
         triangleVerticesVector.size() / 3,
         triangleVerticesVector.data(),
@@ -744,24 +819,23 @@ reactphysics3d::ConcaveMeshShape* CustomMoveManip::createConcaveCollisionShapeFr
 
     // Create ConcaveMeshShape
     auto concaveMeshShape = this->physicsCommon.createConcaveMeshShape(triangleMesh);
-    MString testText4 = "------concaveMeshShape";
-    if (concaveMeshShape == nullptr) {
-        testText4 += " NullPOINTER!!!!";
-    }
-    MGlobal::displayWarning(testText4);
 
     if (concaveMeshShape != nullptr) {
-        // Create a static rigid body (mass = 0)
-        MMatrix m = dagPath.inclusiveMatrix();
+        // Get the transform node of the shape
+        MDagPath transformDagPath = dagPath;
+        transformDagPath.pop();
+
+        // Get the transformation matrix from the transform node
+        MMatrix transformMatrix = transformDagPath.inclusiveMatrix();
 
         // Extract translation from the matrix
-        MVector translation(m[3][0], m[3][1], m[3][2]);
+        MVector translation(transformMatrix[3][0], transformMatrix[3][1], transformMatrix[3][2]);
 
         // Extract rotation matrix and convert it to quaternion
         MMatrix rotationMatrix;
-        rotationMatrix[0][0] = m[0][0]; rotationMatrix[0][1] = m[0][1]; rotationMatrix[0][2] = m[0][2];
-        rotationMatrix[1][0] = m[1][0]; rotationMatrix[1][1] = m[1][1]; rotationMatrix[1][2] = m[1][2];
-        rotationMatrix[2][0] = m[2][0]; rotationMatrix[2][1] = m[2][1]; rotationMatrix[2][2] = m[2][2];
+        rotationMatrix[0][0] = transformMatrix[0][0]; rotationMatrix[0][1] = transformMatrix[0][1]; rotationMatrix[0][2] = transformMatrix[0][2];
+        rotationMatrix[1][0] = transformMatrix[1][0]; rotationMatrix[1][1] = transformMatrix[1][1]; rotationMatrix[1][2] = transformMatrix[1][2];
+        rotationMatrix[2][0] = transformMatrix[2][0]; rotationMatrix[2][1] = transformMatrix[2][1]; rotationMatrix[2][2] = transformMatrix[2][2];
         MTransformationMatrix tm(rotationMatrix);
         MEulerRotation eulerRotation = tm.eulerRotation();
         MQuaternion rotation = eulerRotation.asQuaternion();
@@ -771,16 +845,15 @@ reactphysics3d::ConcaveMeshShape* CustomMoveManip::createConcaveCollisionShapeFr
         reactphysics3d::Quaternion orientation(rotation.x, rotation.y, rotation.z, rotation.w);
         reactphysics3d::Transform transform(position, orientation);
 
-        reactphysics3d::RigidBody* colliderRigidBody = physicsWorld->createRigidBody(transform);
-        colliderRigidBody->setType(reactphysics3d::BodyType::STATIC);
+        reactphysics3d::CollisionBody* colliderCollisionBody = physicsWorld->createCollisionBody(transform);
+        //colliderRigidBody->setType(reactphysics3d::BodyType::STATIC);
 
         // Attach the concave mesh shape to the rigid body
-        colliderRigidBody->addCollider(concaveMeshShape, reactphysics3d::Transform::identity());
-
-        // Now the static rigid body with the attached collision shape is part of the physics world
+        colliderCollisionBody->addCollider(concaveMeshShape, reactphysics3d::Transform::identity());
+        return colliderCollisionBody;
     }
 
-    return concaveMeshShape;
+    return nullptr;
 }
 
 reactphysics3d::ConvexMeshShape* CustomMoveManip::createConvexCollisionShapeFromMObject(const MObject& object) {
@@ -1089,7 +1162,7 @@ void CustomMoveManipContext::selectionChanged(void* data)
             //update active objects and physics world
             manipulator->addSelectedMFnMesh();
             manipulator->clearPhysicsWorld();
-            manipulator->addRigidBodyFromSelectedObject();
+            manipulator->createRigidBodyFromSelectedObject();
 
             MString testText3 = "------selectionChanged";
             MGlobal::displayInfo(testText3);
