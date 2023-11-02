@@ -44,7 +44,7 @@
 
 # Set a default Maya version if not specified
 if(NOT DEFINED MAYA_VERSION)
-    set(MAYA_VERSION 2017 CACHE STRING "Maya version")
+    set(MAYA_VERSION 2023 CACHE STRING "Maya version")
 endif()
 
 # OS Specific environment setup
@@ -84,8 +84,8 @@ find_path(MAYA_INCLUDE_DIR maya/MFn.h
         ${MAYA_LOCATION}
         $ENV{MAYA_LOCATION}
     PATH_SUFFIXES
-        "include/"
         "devkit/include/"
+        "include/"
 )
 
 find_library(MAYA_LIBRARY
@@ -121,7 +121,7 @@ if (NOT TARGET Maya::Maya)
 endif()
 
 # Add the other Maya libraries into the main Maya::Maya library
-set(_MAYA_LIBRARIES OpenMayaAnim OpenMayaFX OpenMayaRender OpenMayaUI Foundation clew)
+set(_MAYA_LIBRARIES OpenMayaAnim OpenMayaFX OpenMayaRender OpenMayaUI Foundation clew Qt53DRender qtfreetype qpng qtmain QTMLClient tbb adskIMF awxml2 cg cgGL Image MetaData OpenMaya Qt5AxBase Qt5AxContainer Qt5AxServer Qt5Bluetooth Qt5Concurrent Qt5Core Qt5DBus Qt5Gamepad Qt5Gui Qt5Help Qt5Multimedia Qt5MultimediaQuick Qt5MultimediaWidgets Qt5Network Qt5Nfc Qt5OpenGL Qt5OpenGLExtensions Qt5Positioning Qt5PositioningQuick Qt5PrintSupport Qt5Qml Qt5QmlModels Qt5QmlWorkerScript Qt5Quick Qt5QuickControls2 Qt5QuickParticles Qt5QuickShapes Qt5QuickTemplates2 Qt5QuickTest Qt5QuickWidgets Qt5RemoteObjects Qt5Scxml Qt5Sensors Qt5SerialBus Qt5SerialPort Qt5Sql Qt5Svg Qt5Test Qt5TextToSpeech Qt5ThemeSupport Qt5UiTools Qt5WebChannel Qt5WebEngine Qt5WebEngineCore Qt5WebEngineWidgets Qt5WebSockets Qt5WebView Qt5Widgets Qt5WindowsUIAutomationSupport Qt5WinExtras Qt5Xml Qt5XmlPatterns Qt53DAnimation Qt53DCore Qt53DExtras Qt53DInput Qt53DLogic Qt53DQuick Qt53DQuickAnimation Qt53DQuickExtras Qt53DQuickInput Qt53DQuickRender Qt53DQuickScene2D)
 foreach(MAYA_LIB ${_MAYA_LIBRARIES})
     find_library(MAYA_${MAYA_LIB}_LIBRARY
         NAMES 

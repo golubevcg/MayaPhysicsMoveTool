@@ -5,9 +5,13 @@
 #include <QtWidgets/qdialog.h>
 #include <QtWidgets/QVBoxLayout>
 #include <QtOpenGL/qglfunctions.h>
-#include <QtOpenGL/QGLWidget>
+#include <QtGui/QOpenGLFunctions>
+#include <QtWidgets/QOpenGLWidget>
+#include <GL/gl.h>
+#include <QtGui/qopenglext.h>
 
-class DebugRenderer : public QGLWidget, protected QOpenGLFunctions {
+
+class DebugRenderer : public QOpenGLWidget, protected QOpenGLFunctions {  // Updated inheritance
 public:
     DebugRenderer(rp3d::PhysicsWorld* physicsWorld, QWidget* parent = nullptr);
 
