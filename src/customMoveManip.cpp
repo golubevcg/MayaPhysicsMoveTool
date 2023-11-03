@@ -1,5 +1,6 @@
 #include <CollisionCandidatesFinder.h>
 #include <BulletCollisionHandler.h>
+#include <MayaToBulletConverter.h>
 
 #include <maya/MFnPlugin.h>
 
@@ -18,16 +19,14 @@ public:
     MStatus doDrag() override;
     MStatus doPress() override;
 
-    CollisionCandidatesFinder collisionCandidatesFinder;
-
 private:
     void updateManipLocations(const MObject& node);
 public:
     MDagPath fFreePointManip;
-    MSelectionList selList;
-   
-    BulletCollisionHandler bulletCollisionHandler;
     static MTypeId id;
+
+    CollisionCandidatesFinder collisionCandidatesFinder;
+    BulletCollisionHandler bulletCollisionHandler;
 };
 
 MTypeId CustomMoveManip::id(0x8001d);
@@ -37,7 +36,6 @@ CustomMoveManip::CustomMoveManip()
     // The constructor must not call createChildren for user-defined manipulators.
     this->collisionCandidatesFinder.getSceneMFnMeshes();
     this->collisionCandidatesFinder.initializeRTree();
-
     this->bulletCollisionHandler.createDynamicsWorld();
 }
 
@@ -237,7 +235,8 @@ void CustomMoveManipContext::selectionChanged(void* data)
             }
 
             manipulator->collisionCandidatesFinder.addActiveObject();
-        }
+            manipulator->bulletCollisionHandler.updateActiveObject(manipulator->collisionCandidatesFinder.activeMFnMesh);
+         }
     }
 }
 

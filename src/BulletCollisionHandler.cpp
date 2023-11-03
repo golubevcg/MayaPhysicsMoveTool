@@ -69,3 +69,13 @@ void BulletCollisionHandler::deleteDynamicsWorld() {
         broadphase = nullptr;
     }
 }
+
+void BulletCollisionHandler::updateActiveObject(MFnMesh* mesh)
+{
+
+}
+
+void BulletCollisionHandler::updateColliders(std::vector<MFnMesh*> collidersMFnMeshes)
+{
+
+}

@@ -31,6 +31,8 @@ class CollisionCandidatesFinder
         MStatus initializeRTree();
         std::vector<MObject> checkNearbyObjects();
     public:
+        MSelectionList selList;
+
         MFnMesh* activeMFnMesh;
         MFnDagNode activeTransformMFnDagNode;
         std::vector<MFnMesh*> allSceneMFnMeshes;

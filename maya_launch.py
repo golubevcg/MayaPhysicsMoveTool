@@ -1,7 +1,7 @@
 import maya.cmds as cmds
 
 # Specify the plugin path
-plugin_path = "C:/Users/golub/Documents/maya_viewport_collision_plugin/build/lib/Release/maya_viewport_collisions_plugin.mll"
+plugin_path = "C:/Users/golub/Documents/maya_viewport_collision_plugin/build/lib/Release/MayaViewportCollisionsPlugin.mll"
 
 # Unload the plugin if it's loaded
 if cmds.pluginInfo(plugin_path, query=True, loaded=True):

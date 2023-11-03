@@ -15,16 +15,15 @@ CollisionCandidatesFinder::~CollisionCandidatesFinder()
 
 MStatus CollisionCandidatesFinder::addActiveObject()
 {
-    MSelectionList selList;
-    MGlobal::getActiveSelectionList(selList);
-    if (selList.isEmpty()) {
+    MGlobal::getActiveSelectionList(this->selList);
+    if (this->selList.isEmpty()) {
         MString warningMessage = "No objects selected";
         MGlobal::displayWarning(warningMessage);
         return MS::kFailure;
     }
 
     MObject node;
-    selList.getDependNode(0, node);  // Get the first selected node
+    this->selList.getDependNode(0, node);  // Get the first selected node
     if (node.hasFn(MFn::kTransform)) {
         bool meshFound = false;
         this->activeTransformMFnDagNode.setObject(node);
