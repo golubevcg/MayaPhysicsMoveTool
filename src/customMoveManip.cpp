@@ -1,6 +1,5 @@
 #include <CollisionCandidatesFinder.h>
 #include <BulletCollisionHandler.h>
-#include <MayaToBulletConverter.h>
 
 #include <maya/MFnPlugin.h>
 
@@ -127,7 +126,6 @@ MStatus CustomMoveManip::doDrag()
     if (!collisionCandidates.empty()) {
 
     }
-
     return MS::kUnknownParameter;
 }
 

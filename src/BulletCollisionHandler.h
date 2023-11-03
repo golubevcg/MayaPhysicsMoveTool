@@ -7,7 +7,6 @@
 #include <vector>
 
 #include "btBulletDynamicsCommon.h"
-#include <MayaToBulletConverter.h>
 
 class BulletCollisionHandler 
 {
@@ -19,12 +18,12 @@ class BulletCollisionHandler
         void deleteDynamicsWorld();
         void updateActiveObject(MFnMesh* mesh);
         void updateColliders(std::vector<MFnMesh*> collidersMFnMeshes);
+        btRigidBody* convertMFnMeshToRigidBody(MFnMesh* mfnMesh);
+        btCollisionShape* convertMFnMeshToCollider(MFnMesh * mfnMesh);
 
         btRigidBody* activeRigidBody;
         std::vector<btCollisionShape*> colliders;
     private:
-        MayaToBulletConverter mayaToBullet;
-
         btBroadphaseInterface* broadphase;
         btDefaultCollisionConfiguration* collisionConfiguration;
         btCollisionDispatcher* dispatcher;

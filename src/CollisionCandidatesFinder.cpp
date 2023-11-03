@@ -128,12 +128,12 @@ std::vector<MObject> CollisionCandidatesFinder::checkNearbyObjects()
 {
     MObject selectedMObject = this->activeMFnMesh->object();
     std::vector<MObject> collisionCandidates;
+
     if (selectedMObject.isNull()) {
         return collisionCandidates;
     }
 
     MStatus status;
-
     MFnDagNode dagNode(selectedMObject);
     MDagPath dagPath;
     MDagPath::getAPathTo(selectedMObject, dagPath);
@@ -174,6 +174,6 @@ std::vector<MObject> CollisionCandidatesFinder::checkNearbyObjects()
         MString debug_message = "Added object to collision candidates:" + MString() + colliderCandidateDagNode.fullPathName();
         MGlobal::displayInfo(debug_message);
     }
-
+    
     return collisionCandidates;
 }
