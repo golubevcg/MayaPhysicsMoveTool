@@ -27,7 +27,6 @@
 #include <maya/MFnFreePointTriadManip.h>
 #include <maya/MFnDistanceManip.h>
 #include <maya/MFnPlugin.h>
-
 #include <cstdint>
 
 // Boost geometry
@@ -35,17 +34,11 @@
 #include <boost/geometry/index/rtree.hpp>
 #include <vector>
 
-namespace bg = boost::geometry;
-namespace bgi = boost::geometry::index;
-
-typedef bg::model::point<float, 3, bg::cs::cartesian> point;
-typedef bg::model::box<point> box;
-typedef std::pair<box, unsigned> value;
-
+#include <BulletCollisionHandler.h>
+#include <CollisionCandidatesFinder.h>
 
 class CustomMoveManip : public MPxManipContainer
 {
-
 public:
     CustomMoveManip();
     ~CustomMoveManip() override;
@@ -58,38 +51,32 @@ public:
     void drawUI(MHWRender::MUIDrawManager&, const MHWRender::MFrameContext&) const override;
     MStatus doDrag() override;
     MStatus doPress() override;
-    MStatus addSelectedMFnMesh();
-    MStatus getSceneMFnMeshes();
-    MStatus initializeRTree();
-    std::vector<MObject> checkNearbyObjects();
+
+    CollisionCandidatesFinder collisionCandidatesFinder;
+
 private:
     void updateManipLocations(const MObject& node);
 public:
     MDagPath fFreePointManip;
     MSelectionList selList;
-    std::vector<MObject> selectedMFnMeshes;
-    std::vector<MObject> selectedTransforms;
-    std::vector<MFnMesh*> mFnMeshes;
-    bgi::rtree<value, bgi::quadratic<16>> rtree;
-
+   
+    BulletCollisionHandler bulletCollisionHandler;
     static MTypeId id;
 };
 MTypeId CustomMoveManip::id(0x8001d);
 
 CustomMoveManip::CustomMoveManip()
 {
-    // The constructor must not call createChildren for user-defined
-    // manipulators.
+    // The constructor must not call createChildren for user-defined manipulators.
+    this->collisionCandidatesFinder.getSceneMFnMeshes();
+    this->collisionCandidatesFinder.initializeRTree();
 
-    this->getSceneMFnMeshes();
-    this->initializeRTree();
+    this->bulletCollisionHandler.createDynamicsWorld();
 }
 
 CustomMoveManip::~CustomMoveManip()
 {
-    for (MFnMesh* mesh : this->mFnMeshes) {
-        delete mesh;
-    }
+
 }
 
 void* CustomMoveManip::creator()
@@ -118,133 +105,6 @@ MStatus CustomMoveManip::createChildren()
     return stat;
 }
 
-MStatus CustomMoveManip::addSelectedMFnMesh() {
-
-    MString warningMessage3 = "addSelectedMFnMesh";
-    MGlobal::displayWarning(warningMessage3);
-
-    MSelectionList selList;
-    MGlobal::getActiveSelectionList(selList);
-
-    this->selectedMFnMeshes.clear();
-    this->selectedTransforms.clear();
-
-    if (selList.isEmpty()) {
-        MString warningMessage = "No objects selected";
-        MGlobal::displayWarning(warningMessage);
-        return MS::kFailure;
-    }
-
-    MObject node;
-    selList.getDependNode(0, node);  // Get the first selected node
-
-    if (node.hasFn(MFn::kTransform)) {
-        MFnDagNode dagNode(node);
-        bool meshFound = false;
-
-        this->selectedTransforms.push_back(node);
-
-        for (unsigned int i = 0; i < dagNode.childCount(); ++i) {
-            MObject child = dagNode.child(i);
-            if (child.hasFn(MFn::kMesh)) {
-                MFnMesh mesh(child);
-
-                MString infoMessage = "Mesh object found: " + mesh.name();
-                MGlobal::displayInfo(infoMessage);
-
-                this->selectedMFnMeshes.push_back(child);
-                meshFound = true;
-                break;
-            }
-        }
-
-        if (!meshFound) {
-            MString warningMessage = "No mesh found for the selected transform";
-            MGlobal::displayWarning(warningMessage);
-            return MS::kFailure;
-        }
-    }
-    else {
-        MString warningMessage = "Selected object is not a transform";
-        MGlobal::displayWarning(warningMessage);
-        return MS::kFailure;
-    }
-
-    MString warningMessage4 = "Mesh object added!";
-    MGlobal::displayWarning(warningMessage4);
-
-    return MS::kSuccess;
-}
-
-MStatus CustomMoveManip::getSceneMFnMeshes() {
-    
-    MStatus status;
-    MItDag dagIterator(MItDag::kDepthFirst, MFn::kMesh, &status);
-
-    if (status != MS::kSuccess) {
-        MGlobal::displayError("MItDag initialization failed");
-        return status;
-    }
-
-    for (; !dagIterator.isDone(); dagIterator.next()) {
-        MDagPath dagPath;
-        status = dagIterator.getPath(dagPath);
-
-        if (status != MS::kSuccess) {
-            MGlobal::displayError("Failed to get MDagPath");
-            continue;
-        }
-
-        MFnMesh* fnMesh = new MFnMesh(dagPath, &status);
-        if (status != MS::kSuccess) {
-            MGlobal::displayError("MFnMesh initialization failed");
-            continue;
-        }
-
-        MBoundingBox boundingBox = fnMesh->boundingBox(&status);
-        if (status != MS::kSuccess) {
-            MGlobal::displayError("Failed to get bounding box");
-            continue;
-        }
-
-        this->mFnMeshes.push_back(fnMesh);
-    }
-
-    return MS::kSuccess;
-}
-
-MStatus CustomMoveManip::initializeRTree() {
-
-    if (this->mFnMeshes.empty()) {
-        MGlobal::displayError("MFnMeshes vector is empty");
-        return MS::kFailure;
-    }
-
-    MStatus status;
-
-    for (size_t i = 0; i < this->mFnMeshes.size(); ++i) {
-        MDagPath dagPath;
-        status = this->mFnMeshes[i]->getPath(dagPath);
-        if (status != MS::kSuccess) {
-            MGlobal::displayError("Failed to get MDagPath from MFnMesh");
-            return status;
-        }
-
-        //exclude selected object
-
-        MBoundingBox mbbox = this->mFnMeshes[i]->boundingBox();
-        MMatrix worldMatrix = dagPath.inclusiveMatrix();
-
-        MPoint minPoint = mbbox.min() * worldMatrix;
-        MPoint maxPoint = mbbox.max() * worldMatrix;
-
-        box bbox(point(minPoint.x, minPoint.y, minPoint.z), point(maxPoint.x, maxPoint.y, maxPoint.z));
-        this->rtree.insert(std::make_pair(bbox, i));  // i is the identifier
-    }
-
-    return MS::kSuccess;
-}
-
 MStatus CustomMoveManip::connectToDependNode(const MObject& node)
 {
     MStatus stat;
@@ -255,7 +115,7 @@ MStatus CustomMoveManip::connectToDependNode(const MObject& node)
     MFnDependencyNode nodeFn(node);
     MPlug tPlug = nodeFn.findPlug("translate", true, &stat);
     MFnFreePointTriadManip freePointManipFn(this->fFreePointManip);
-    //freePointManipFn.connectToPointPlug(tPlug);
+    freePointManipFn.connectToPointPlug(tPlug);
     this->updateManipLocations(node);
     this->finishAddingManips();
     MPxManipContainer::connectToDependNode(node);
@@ -297,68 +157,15 @@ MStatus CustomMoveManip::doPress()
 
 MStatus CustomMoveManip::doDrag()
 {
-    std::vector<MObject> collisionCandidates = this->checkNearbyObjects();
+    std::vector<MObject> collisionCandidates = this->collisionCandidatesFinder.checkNearbyObjects();
 
     if (!collisionCandidates.empty()) {
+
     }
 
     return MS::kUnknownParameter;
 }
 
-std::vector<MObject> CustomMoveManip::checkNearbyObjects() {
-
-    std::vector<MObject> collisionCandidates;
-    if (this->selectedMFnMeshes.size() == 0) {
-        return collisionCandidates;
-    }
-
-    for (const auto& currentMObject : this->selectedMFnMeshes) {
-        MStatus status;
-
-        MFnDagNode dagNode(currentMObject);
-        MDagPath dagPath;
-        MDagPath::getAPathTo(currentMObject, dagPath);
-        MFnTransform transform(dagPath.transform(), &status);
-        if (status != MStatus::kSuccess) {
-            // Handle error
-            return collisionCandidates;
-        }
-        MMatrix worldMatrix = transform.transformationMatrix();
-
-        MBoundingBox boundingBox = dagNode.boundingBox();
-        MPoint worldMinPoint = boundingBox.min() * worldMatrix;
-        MPoint worldMaxPoint = boundingBox.max() * worldMatrix;
-
-        // Expand the bounding box by a certain distance to find nearby objects
-        double distance = 0.1;
-        worldMinPoint -= MVector(distance, distance, distance);
-        worldMaxPoint += MVector(distance, distance, distance);
-
-        box queryBox(point(worldMinPoint.x, worldMinPoint.y, worldMinPoint.z),
-            point(worldMaxPoint.x, worldMaxPoint.y, worldMaxPoint.z));
-
-        std::vector<value> result;
-        this->rtree.query(bgi::intersects(queryBox), std::back_inserter(result));
-
-        // collect all collided objects
-        for (const auto& item : result) {
-            // TODO:CHANGE THIS TO CONDITION CHECK THAT DAG MOBJECT ALREADY IN THE LIST
-            if (this->mFnMeshes[item.second]->object() != currentMObject) {  // Exclude the selected mesh itself
-                MFnDagNode dagNode1(this->mFnMeshes[item.second]->object());
-                MString rtree = "added mobject from RTREE" + MString() + dagNode1.fullPathName() + MString() + worldMinPoint.x + worldMinPoint.y + worldMinPoint.z;
-                MGlobal::displayInfo(rtree);
-                                                                             
-                //MString txt = "The selected object is near another object.";
-                //MGlobal::displayInfo(txt);
-                collisionCandidates.push_back(this->mFnMeshes[item.second]->object());
-                MString txt11 = "Added object to collision candidates";
-                MGlobal::displayInfo(txt11);
-            }
-        }
-    }
-
-    return collisionCandidates;
-}
 
 void CustomMoveManip::drawUI(MHWRender::MUIDrawManager& drawManager, const MHWRender::MFrameContext& frameContext) const
 {
@@ -450,6 +257,9 @@ void CustomMoveManipContext::selectionChanged(void* data)
                 dependNodeFn.name());
             continue;
         }
+
+        MString manipName("customMoveManip");
+        MObject manipObject;
         CustomMoveManip* manipulator = (CustomMoveManip*)CustomMoveManip::newManipulator(manipName, manipObject);
         if (NULL != manipulator) {
             ctxPtr->addManipulator(manipObject);
@@ -460,7 +270,7 @@ void CustomMoveManipContext::selectionChanged(void* data)
                     " object: " + dependNodeFn.name());
             }
 
-            manipulator->addSelectedMFnMesh();
+            manipulator->collisionCandidatesFinder.addActiveObject();
         }
     }
 }
