@@ -1,31 +1,5 @@
 #include "CollisionCandidatesFinder.h"
 
-// Maya
-#include <maya/MIOStream.h>
-#include <maya/MFn.h>
-#include <maya/MPxNode.h>
-#include <maya/MPxManipContainer.h>
-#include <maya/MPxSelectionContext.h>
-#include <maya/MPxContextCommand.h>
-#include <maya/MModelMessage.h>
-#include <maya/MFnPlugin.h>
-#include <maya/MGlobal.h>
-#include <maya/MItSelectionList.h>
-#include <maya/MPoint.h>
-#include <maya/MVector.h>
-#include <maya/MDagPath.h>
-#include <maya/MManipData.h>
-#include <maya/MMatrix.h>
-#include <maya/MItDag.h>
-#include <maya/MFnMesh.h>
-#include <maya/MBoundingBox.h>
-#include <maya/MPointArray.h>
-#include <maya/MQuaternion.h>
-#include <maya/MEulerRotation.h>
-#include <maya/MFnFreePointTriadManip.h>
-#include <maya/MFnDistanceManip.h>
-#include <maya/MFnPlugin.h>
-#include <cstdint>
 
 CollisionCandidatesFinder::CollisionCandidatesFinder()
 {
@@ -137,8 +111,6 @@ MStatus CollisionCandidatesFinder::initializeRTree()
             MGlobal::displayError("Failed to get MDagPath from MFnMesh");
             return status;
         }
-
-        //exclude selected object
 
         MBoundingBox mbbox = this->allSceneMFnMeshes[i]->boundingBox();
         MMatrix worldMatrix = dagPath.inclusiveMatrix();

@@ -1,4 +1,5 @@
-// CollisionCandidatesFinder.h
+#pragma once
+
 #ifndef COLLISION_CANDIDATES_FINDER_H
 #define COLLISION_CANDIDATES_FINDER_H
 
@@ -6,13 +7,11 @@
 #include <vector>
 #include <stdlib.h>
 
-#include <maya/MGlobal.h>
-#include <maya/MFnDagNode.h>
+#include <MayaIncludes.h>
 
 // Boost geometry
 #include <boost/geometry.hpp>
 #include <boost/geometry/index/rtree.hpp>
-#include <vector>
 
 namespace bg = boost::geometry;
 namespace bgi = boost::geometry::index;

@@ -1,41 +1,7 @@
-#include <stdio.h>
-#include <vector>
-#include <stdlib.h>
-
-// Maya
-#include <maya/MIOStream.h>
-#include <maya/MFn.h>
-#include <maya/MPxNode.h>
-#include <maya/MPxManipContainer.h>
-#include <maya/MPxSelectionContext.h>
-#include <maya/MPxContextCommand.h>
-#include <maya/MModelMessage.h>
-#include <maya/MFnPlugin.h>
-#include <maya/MGlobal.h>
-#include <maya/MItSelectionList.h>
-#include <maya/MPoint.h>
-#include <maya/MVector.h>
-#include <maya/MDagPath.h>
-#include <maya/MManipData.h>
-#include <maya/MMatrix.h>
-#include <maya/MItDag.h>
-#include <maya/MFnMesh.h>
-#include <maya/MBoundingBox.h>
-#include <maya/MPointArray.h>
-#include <maya/MQuaternion.h>
-#include <maya/MEulerRotation.h>
-#include <maya/MFnFreePointTriadManip.h>
-#include <maya/MFnDistanceManip.h>
-#include <maya/MFnPlugin.h>
-#include <cstdint>
-
-// Boost geometry
-#include <boost/geometry.hpp>
-#include <boost/geometry/index/rtree.hpp>
-#include <vector>
-
-#include <BulletCollisionHandler.h>
 #include <CollisionCandidatesFinder.h>
+#include <BulletCollisionHandler.h>
+
+#include <maya/MFnPlugin.h>
 
 class CustomMoveManip : public MPxManipContainer
 {
@@ -63,6 +29,7 @@ public:
     BulletCollisionHandler bulletCollisionHandler;
     static MTypeId id;
 };
+
 MTypeId CustomMoveManip::id(0x8001d);
 
 CustomMoveManip::CustomMoveManip()
@@ -165,7 +132,6 @@ MStatus CustomMoveManip::doDrag()
 
     return MS::kUnknownParameter;
 }
-
 
 void CustomMoveManip::drawUI(MHWRender::MUIDrawManager& drawManager, const MHWRender::MFrameContext& frameContext) const
 {

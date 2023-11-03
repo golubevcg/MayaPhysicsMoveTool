@@ -1,3 +1,5 @@
+#pragma once
+
 // BulletCollisionHandler.h
 #ifndef BULLET_COLLISION_HANDLER_H
 #define BULLET_COLLISION_HANDLER_H
