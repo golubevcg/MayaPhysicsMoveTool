@@ -12,7 +12,8 @@ BulletCollisionHandler::BulletCollisionHandler()
     dispatcher(nullptr),
     solver(nullptr),
     dynamicsWorld(nullptr),
-    activeRigidBody(nullptr)
+    activeRigidBody(nullptr),
+    proxyRigidBody(nullptr)
 {
 }
 
@@ -78,23 +79,72 @@ void BulletCollisionHandler::deleteDynamicsWorld() {
 
 void BulletCollisionHandler::updateActiveObject(MFnMesh* mesh)
 {
-
-    // Check if there's an existing activeRigidBody, and remove it from the world
-    if (this->activeRigidBody != nullptr) {
-        this->dynamicsWorld->removeRigidBody(this->activeRigidBody);
-        delete this->activeRigidBody;
-    }
+    this->cleanRigidBody(this->activeRigidBody);
 
     this->activeRigidBody = this->convertMFnMeshToRigidBody(mesh);
 
-    if (this->activeRigidBody == nullptr) {
-        MString test = "activeRigidBody is nullptr.";
-        MGlobal::displayInfo(test);
-    }
     this->dynamicsWorld->addRigidBody(this->activeRigidBody);
     MString info_msg = "BulletCollisionHandler:active object was updated and added to the dynamicsWorld.";
     MGlobal::displayInfo(info_msg);
+
+    // setup proxy object
+    this->updateActiveObjectProxy(this->activeRigidBody->getWorldTransform());
+    this->constrainBodies(this->activeRigidBody, this->proxyRigidBody);
+    //constrain them
 }
+
+void BulletCollisionHandler::updateActiveObjectProxy(const btTransform& startTransform) {
+    this->cleanRigidBody(this->proxyRigidBody);
+
+    // Assume a box shape for the proxy object for simplicity
+    btCollisionShape* shape = new btBoxShape(btVector3(1, 1, 1)); // A 1m cube
+
+    // Kinematic objects have zero mass
+    btScalar mass(0.f);
+
+    // Motion state with the starting transform
+    btDefaultMotionState* motionState = new btDefaultMotionState(startTransform);
+
+    // Rigidbody construction info
+    btRigidBody::btRigidBodyConstructionInfo rbInfo(mass, motionState, shape);
+
+    // Create the rigid body
+    this->proxyRigidBody = new btRigidBody(rbInfo);
+
+    // Set the body to kinematic
+    this->proxyRigidBody->setCollisionFlags(this->proxyRigidBody->getCollisionFlags() | btCollisionObject::CF_KINEMATIC_OBJECT);
+
+    // Disable deactivation
+    this->proxyRigidBody->setActivationState(DISABLE_DEACTIVATION);
+
+    // Add the body to the world
+    this->dynamicsWorld->addRigidBody(this->proxyRigidBody);
+}
+
+void BulletCollisionHandler::cleanRigidBody(btRigidBody* body) {
+    if (body) {
+        // Remove it from the world
+        this->dynamicsWorld->removeRigidBody(body);
+
+        // Delete the motion state and the rigid body to avoid memory leaks
+        delete body->getMotionState();
+        delete body;
+        body = nullptr; // Ensure the pointer is reset to nullptr after deletion
+    }
+}
+
+void BulletCollisionHandler::constrainBodies(btRigidBody* mainBody, btRigidBody* proxyBody) {
+    // Create a point-to-point constraint between the two bodies
+    // This will keep them at the same location, but allow for rotations.
+    btTypedConstraint* constraint = new btPoint2PointConstraint(*mainBody, *proxyBody, btVector3(0, 0, 0), btVector3(0, 0, 0));
+
+    // Optionally set some constraint parameters
+    // static_cast<btPoint2PointConstraint*>(constraint)->m_setting.m_impulseClamp = 10; // example parameter
+
+    // Add the constraint to the world
+    this->dynamicsWorld->addConstraint(constraint, true);
+}
+
 
 void BulletCollisionHandler::updateColliders(std::vector<MFnMesh*> collidersMFnMeshes)
 {

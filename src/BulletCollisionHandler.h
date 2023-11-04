@@ -16,12 +16,17 @@ class BulletCollisionHandler
 
         void createDynamicsWorld();
         void deleteDynamicsWorld();
+
+        void cleanRigidBody(btRigidBody* body);
         void updateActiveObject(MFnMesh* mesh);
+        void updateActiveObjectProxy(const btTransform& startTransform);
+        void constrainBodies(btRigidBody* mainBody, btRigidBody* proxyBody);
         void updateColliders(std::vector<MFnMesh*> collidersMFnMeshes);
         btRigidBody* convertMFnMeshToRigidBody(MFnMesh* mfnMesh);
         btCollisionShape* convertMFnMeshToCollider(MFnMesh * mfnMesh);
 
         btRigidBody* activeRigidBody;
+        btRigidBody* proxyRigidBody;
         std::vector<btCollisionShape*> colliders;
     private:
         btBroadphaseInterface* broadphase;
