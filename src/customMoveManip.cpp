@@ -128,12 +128,11 @@ MStatus CustomMoveManip::doDrag()
     // update world
     this->bulletCollisionHandler.updateWorld(5);
 
-    std::vector<MObject> collisionCandidates = this->collisionCandidatesFinder.checkNearbyObjects();
+    std::vector<MFnMesh*> collisionCandidates = this->collisionCandidatesFinder.checkNearbyObjects();
 
     if (!collisionCandidates.empty()) {
-
+        this->bulletCollisionHandler.updateColliders(collisionCandidates);
     }
-
 
     // read translate from manip
     MFnManip3D manipFn(this->fFreePointManipDagPath);
@@ -149,7 +148,7 @@ MStatus CustomMoveManip::doDrag()
     );
 
     // update world 10 times
-    this->bulletCollisionHandler.updateWorld(10);
+    this->bulletCollisionHandler.updateWorld(100);
 
     // read transform from active object
     MMatrix proxyObjectUpdatedMatrix = this->bulletCollisionHandler.getProxyObjectTransformMMatrix();
@@ -162,14 +161,6 @@ MStatus CustomMoveManip::doDrag()
 void CustomMoveManip::applyProxyTransformToActiveObject(MMatrix matrix) {
     MGlobal::displayInfo("applyProxyTransformToActiveObject");
     if (this->bulletCollisionHandler.proxyRigidBody) {
-        MGlobal::displayInfo("inside body!");
-        // Debug print the matrix values
-        for (int i = 0; i < 4; ++i) {
-            MStreamUtils::stdOutStream() << matrix[i][0] << ", "
-                << matrix[i][1] << ", "
-                << matrix[i][2] << ", "
-                << matrix[i][3] << "\n";
-        }
 
         // Get the MFnDagNode of the active object
         MFnDagNode& activeDagNode = this->collisionCandidatesFinder.activeTransformMFnDagNode;

@@ -124,10 +124,10 @@ MStatus CollisionCandidatesFinder::initializeRTree()
     return MS::kSuccess;
 }
 
-std::vector<MObject> CollisionCandidatesFinder::checkNearbyObjects()
+std::vector<MFnMesh*> CollisionCandidatesFinder::checkNearbyObjects()
 {
     MObject selectedMObject = this->activeMFnMesh->object();
-    std::vector<MObject> collisionCandidates;
+    std::vector<MFnMesh*> collisionCandidates;
 
     if (selectedMObject.isNull()) {
         return collisionCandidates;
@@ -167,7 +167,7 @@ std::vector<MObject> CollisionCandidatesFinder::checkNearbyObjects()
             continue;
         }
 
-        collisionCandidates.push_back(this->allSceneMFnMeshes[item.second]->object());
+        collisionCandidates.push_back(this->allSceneMFnMeshes[item.second]);
 
         // debug print
         MFnDagNode colliderCandidateDagNode(this->allSceneMFnMeshes[item.second]->object());

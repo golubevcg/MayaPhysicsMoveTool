@@ -184,7 +184,6 @@ MMatrix BulletCollisionHandler::getProxyObjectTransformMMatrix() {
     return MMatrix::identity;
 }
 
-
 void BulletCollisionHandler::cleanRigidBody(btRigidBody* body) {
     if (body) {
         // Remove it from the world
@@ -209,10 +208,37 @@ void BulletCollisionHandler::constrainBodies(btRigidBody* mainBody, btRigidBody*
     this->dynamicsWorld->addConstraint(constraint, true);
 }
 
-
 void BulletCollisionHandler::updateColliders(std::vector<MFnMesh*> collidersMFnMeshes)
 {
+    // Remove all existing colliders from the world and delete them
+    for (auto& collider : this->colliders) {
+        if (collider) {
+            this->dynamicsWorld->removeCollisionObject(collider);
+            delete collider->getCollisionShape();
+            btRigidBody* body = btRigidBody::upcast(collider);
+            if (body && body->getMotionState()) {
+                delete body->getMotionState();
+            }
+            delete collider;
+        }
+    }
+    this->colliders.clear();
 
+    // Add new colliders based on the provided MFnMeshes
+    for (auto& mfnMesh : collidersMFnMeshes) {
+        btCollisionShape* newShape = convertMFnMeshToCollider(mfnMesh);
+
+        // Create a rigid body with a mass of 0 for a static object
+        btDefaultMotionState* motionState = new btDefaultMotionState();
+        btRigidBody::btRigidBodyConstructionInfo rbInfo(0, motionState, newShape, btVector3(0, 0, 0));
+        btRigidBody* rigidBody = new btRigidBody(rbInfo);
+
+        // Add the new rigid body to the dynamics world
+        this->dynamicsWorld->addRigidBody(rigidBody);
+
+        // Keep a reference to the collider for later removal or other operations
+        this->colliders.push_back(rigidBody);
+    }
 }
 
 btRigidBody* BulletCollisionHandler::convertMFnMeshToRigidBody(MFnMesh* mfnMesh) {
@@ -274,8 +300,48 @@ btRigidBody* BulletCollisionHandler::convertMFnMeshToRigidBody(MFnMesh* mfnMesh)
     return body;
 }
 
-/*
 btCollisionShape* BulletCollisionHandler::convertMFnMeshToCollider(MFnMesh* mfnMesh) {
 
+
+    // Retrieve global transformation matrix
+    MDagPath dagPath;
+    MFnDagNode dagNode(mfnMesh->object());
+    dagNode.getPath(dagPath);
+    dagPath.extendToShape();
+    MFnTransform fnTransform(dagPath.transform());
+    MMatrix worldMatrix = fnTransform.transformationMatrix();
+
+    // Get the points in local space
+    MPointArray mayaVertices;
+    mfnMesh->getPoints(mayaVertices, MSpace::kObject);
+
+    // Create the Bullet triangle mesh
+    btTriangleMesh* triMesh = new btTriangleMesh();
+
+    // Loop through polygons
+    for (int i = 0; i < mfnMesh->numPolygons(); ++i) {
+        MIntArray polygonVertices;
+        mfnMesh->getPolygonVertices(i, polygonVertices);
+        btVector3 vertices[3];
+
+        for (int j = 0; j < 3; ++j) {
+            // Get the vertex index
+            int vertexIndex = polygonVertices[j];
+
+            // Transform the vertex position to world space
+            MPoint worldSpaceVertex = mayaVertices[vertexIndex] * worldMatrix;
+
+            // Add vertex to Bullet triangle mesh
+            vertices[j] = btVector3(worldSpaceVertex.x, worldSpaceVertex.y, worldSpaceVertex.z);
+        }
+
+        // Add the triangle to the mesh
+        triMesh->addTriangle(vertices[0], vertices[1], vertices[2]);
+    }
+
+    // Create the mesh shape
+    bool useQuantizedAABBCompression = true;
+    btBvhTriangleMeshShape* meshShape = new btBvhTriangleMeshShape(triMesh, useQuantizedAABBCompression);
+
+    return meshShape;
 }
-*/

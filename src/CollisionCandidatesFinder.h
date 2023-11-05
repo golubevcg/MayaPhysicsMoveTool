@@ -29,7 +29,7 @@ class CollisionCandidatesFinder
         MStatus addActiveObject();
         MStatus getSceneMFnMeshes();
         MStatus initializeRTree();
-        std::vector<MObject> checkNearbyObjects();
+        std::vector<MFnMesh*> checkNearbyObjects();
     public:
         MSelectionList selList;
 

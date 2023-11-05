@@ -33,7 +33,7 @@ class BulletCollisionHandler
 
         btRigidBody* activeRigidBody;
         btRigidBody* proxyRigidBody;
-        std::vector<btCollisionShape*> colliders;
+        std::vector<btRigidBody*> colliders;
     private:
         btBroadphaseInterface* broadphase;
         btDefaultCollisionConfiguration* collisionConfiguration;
