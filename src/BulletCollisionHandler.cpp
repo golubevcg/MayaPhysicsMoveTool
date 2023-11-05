@@ -77,6 +77,19 @@ void BulletCollisionHandler::deleteDynamicsWorld() {
     }
 }
 
+void BulletCollisionHandler::updateWorld(float framesToUpdate) {
+    float fps = 24.0f; // This is your simulation's fps
+
+    // Calculate deltaTime assuming each frame is 1/fps seconds long
+    float deltaTime = framesToUpdate / fps;
+
+    int maxSubSteps = 10;
+    float fixedTimeStep = 1.f / fps; // This is the time each physics "step" represents at 24fps
+
+    // Update the dynamics world by the deltaTime
+    this->dynamicsWorld->stepSimulation(deltaTime, maxSubSteps, fixedTimeStep);
+}
+
 void BulletCollisionHandler::updateActiveObject(MFnMesh* mesh)
 {
     this->cleanRigidBody(this->activeRigidBody);
@@ -120,6 +133,57 @@ void BulletCollisionHandler::updateActiveObjectProxy(const btTransform& startTra
     // Add the body to the world
     this->dynamicsWorld->addRigidBody(this->proxyRigidBody);
 }
+
+void BulletCollisionHandler::setProxyObjectPosition(float x, float y, float z) {
+    // Check if the proxy body exists
+    if (this->proxyRigidBody) {
+        // Create a new position vector from the input floats
+        btVector3 newPosition(x, y, z);
+
+        // Get the current transform
+        btTransform currentTransform = this->proxyRigidBody->getWorldTransform();
+
+        // Set the new position while keeping the current rotation
+        currentTransform.setOrigin(newPosition);
+
+        // Update the transform of the proxy body
+        this->proxyRigidBody->setWorldTransform(currentTransform);
+
+        // For kinematic objects, you also need to update the motion state
+        btMotionState* motionState = this->proxyRigidBody->getMotionState();
+        if (motionState) {
+            motionState->setWorldTransform(currentTransform);
+        }
+    }
+}
+
+MMatrix BulletCollisionHandler::getProxyObjectTransformMMatrix() {
+    if (this->proxyRigidBody) {
+        btTransform btTrans;
+        btMotionState* motionState = this->proxyRigidBody->getMotionState();
+        if (motionState) {
+            motionState->getWorldTransform(btTrans);
+        }
+        else {
+            btTrans = this->proxyRigidBody->getWorldTransform();
+        }
+
+        // Convert btTransform to MMatrix
+        btScalar btMatrix[16];
+        btTrans.getOpenGLMatrix(btMatrix);
+        MMatrix mayaMatrix;
+        for (int i = 0; i < 4; ++i) {
+            for (int j = 0; j < 4; ++j) {
+                mayaMatrix[i][j] = btMatrix[i * 4 + j];
+            }
+        }
+        return mayaMatrix;
+    }
+
+    // If the proxy object does not exist, return an identity matrix
+    return MMatrix::identity;
+}
+
 
 void BulletCollisionHandler::cleanRigidBody(btRigidBody* body) {
     if (body) {

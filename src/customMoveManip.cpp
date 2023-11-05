@@ -2,12 +2,14 @@
 #include <BulletCollisionHandler.h>
 
 #include <maya/MFnPlugin.h>
+#include <maya/MStreamUtils.h>
 
 class CustomMoveManip : public MPxManipContainer
 {
 public:
     CustomMoveManip();
     ~CustomMoveManip() override;
+
 
     static void* creator();
     static MStatus initialize();
@@ -18,10 +20,12 @@ public:
     MStatus doDrag() override;
     MStatus doPress() override;
 
+    void applyProxyTransformToActiveObject(MMatrix matrix);
+
 private:
     void updateManipLocations(const MObject& node);
 public:
-    MDagPath fFreePointManip;
+    MDagPath fFreePointManipDagPath;
     static MTypeId id;
 
     CollisionCandidatesFinder collisionCandidatesFinder;
@@ -63,7 +67,7 @@ MStatus CustomMoveManip::createChildren()
     MStatus stat = MStatus::kSuccess;
     MPoint startPoint(0.0, 0.0, 0.0);
     MVector direction(0.0, 1.0, 0.0);
-    this->fFreePointManip = addFreePointTriadManip("pointManip",
+    this->fFreePointManipDagPath = addFreePointTriadManip("pointManip",
         "freePoint");
 
     return stat;
@@ -78,8 +82,8 @@ MStatus CustomMoveManip::connectToDependNode(const MObject& node)
     //
     MFnDependencyNode nodeFn(node);
     MPlug tPlug = nodeFn.findPlug("translate", true, &stat);
-    MFnFreePointTriadManip freePointManipFn(this->fFreePointManip);
-    freePointManipFn.connectToPointPlug(tPlug);
+    MFnFreePointTriadManip freePointManipFn(this->fFreePointManipDagPath);
+    //freePointManipFn.connectToPointPlug(tPlug);
     this->updateManipLocations(node);
     this->finishAddingManips();
     MPxManipContainer::connectToDependNode(node);
@@ -93,7 +97,7 @@ void CustomMoveManip::updateManipLocations(const MObject& node)
 //        setTranslation and setRotation to the parent's transformation.
 //
 {
-    MFnFreePointTriadManip manipFn(this->fFreePointManip);
+    MFnFreePointTriadManip manipFn(this->fFreePointManipDagPath);
 
     MDagPath dagPath;
     MFnDagNode(node).getPath(dagPath);
@@ -121,13 +125,71 @@ MStatus CustomMoveManip::doPress()
 
 MStatus CustomMoveManip::doDrag()
 {
+    // update world
+    this->bulletCollisionHandler.updateWorld(5);
+
     std::vector<MObject> collisionCandidates = this->collisionCandidatesFinder.checkNearbyObjects();
 
     if (!collisionCandidates.empty()) {
 
     }
+
+
+    // read translate from manip
+    MFnManip3D manipFn(this->fFreePointManipDagPath);
+    MPoint currentPosition;
+    this->getConverterManipValue(0, currentPosition);
+    MPoint currentTranslation = manipFn.translation(MSpace::kTransform);
+
+    // set transform to proxy object
+    this->bulletCollisionHandler.setProxyObjectPosition(
+        currentPosition.x + currentTranslation.x, 
+        currentPosition.y + currentTranslation.y,
+        currentPosition.z + currentTranslation.z
+    );
+
+    // update world 10 times
+    this->bulletCollisionHandler.updateWorld(10);
+
+    // read transform from active object
+    MMatrix proxyObjectUpdatedMatrix = this->bulletCollisionHandler.getProxyObjectTransformMMatrix();
+
+    // set transform to maya's transform
+    this->applyProxyTransformToActiveObject(proxyObjectUpdatedMatrix);
     return MS::kUnknownParameter;
 }
+
+void CustomMoveManip::applyProxyTransformToActiveObject(MMatrix matrix) {
+    MGlobal::displayInfo("applyProxyTransformToActiveObject");
+    if (this->bulletCollisionHandler.proxyRigidBody) {
+        MGlobal::displayInfo("inside body!");
+        // Debug print the matrix values
+        for (int i = 0; i < 4; ++i) {
+            MStreamUtils::stdOutStream() << matrix[i][0] << ", "
+                << matrix[i][1] << ", "
+                << matrix[i][2] << ", "
+                << matrix[i][3] << "\n";
+        }
+
+        // Get the MFnDagNode of the active object
+        MFnDagNode& activeDagNode = this->collisionCandidatesFinder.activeTransformMFnDagNode;
+
+        // Get the MDagPath of the active object to ensure we're modifying the correct instance
+        MDagPath dagPath;
+        activeDagNode.getPath(dagPath);
+
+        // Get the MFnTransform of the active object using the dagPath
+        MFnTransform activeTransform(dagPath);
+
+        // Set the transformation matrix of the active object to match the proxy object
+        MStatus status = activeTransform.set(MTransformationMatrix(matrix));
+        if (!status) {
+            // Handle the error if the transformation could not be set
+            MGlobal::displayError("Error setting transformation: " + status.errorString());
+        }
+    }
+}
+
 
 void CustomMoveManip::drawUI(MHWRender::MUIDrawManager& drawManager, const MHWRender::MFrameContext& frameContext) const
 {
@@ -238,6 +300,8 @@ void CustomMoveManipContext::selectionChanged(void* data)
     }
 }
 
+
+
 //
 // moveManipContext
 //
@@ -248,7 +312,9 @@ class CustoMoveManipContext : public MPxContextCommand
 {
 public:
     CustoMoveManipContext() {};
+    MPoint getCurrentPosition();
     MPxContext* makeObj() override;
+
 public:
     static void* creator();
 };
