@@ -1,4 +1,6 @@
 // MayaToBulletUtils.cpp
+
+#include <string>
 #include <MayaIncludes.h>
 #include "BulletCollisionHandler.h"
 
@@ -177,7 +179,17 @@ MMatrix BulletCollisionHandler::getProxyObjectTransformMMatrix() {
                 mayaMatrix[i][j] = btMatrix[i * 4 + j];
             }
         }
-        return mayaMatrix;
+
+        // Adjust for coordinate system differences between Bullet and Maya
+        // Swap Y and Z axis and negate the new Z axis (which was Y in Bullet)
+        MMatrix coordinateConversionMatrix = MMatrix::identity;
+        coordinateConversionMatrix[1][1] = 0.0;
+        coordinateConversionMatrix[1][2] = 1.0;
+        coordinateConversionMatrix[2][1] = -1.0;
+        coordinateConversionMatrix[2][2] = 0.0;
+
+        // Return the transformed matrix
+        return mayaMatrix * coordinateConversionMatrix;
     }
 
     // If the proxy object does not exist, return an identity matrix
@@ -301,8 +313,6 @@ btRigidBody* BulletCollisionHandler::convertMFnMeshToRigidBody(MFnMesh* mfnMesh)
 }
 
 btCollisionShape* BulletCollisionHandler::convertMFnMeshToCollider(MFnMesh* mfnMesh) {
-
-
     // Retrieve global transformation matrix
     MDagPath dagPath;
     MFnDagNode dagNode(mfnMesh->object());
@@ -318,25 +328,41 @@ btCollisionShape* BulletCollisionHandler::convertMFnMeshToCollider(MFnMesh* mfnM
     // Create the Bullet triangle mesh
     btTriangleMesh* triMesh = new btTriangleMesh();
 
-    // Loop through polygons
-    for (int i = 0; i < mfnMesh->numPolygons(); ++i) {
-        MIntArray polygonVertices;
-        mfnMesh->getPolygonVertices(i, polygonVertices);
-        btVector3 vertices[3];
+    // Get triangles from the mesh
+    MIntArray triangleCounts, triangleVertices;
+    mfnMesh->getTriangles(triangleCounts, triangleVertices);
 
-        for (int j = 0; j < 3; ++j) {
-            // Get the vertex index
-            int vertexIndex = polygonVertices[j];
+    // Index variables for triangleVertices
+    int triangleIndex = 0;
 
-            // Transform the vertex position to world space
-            MPoint worldSpaceVertex = mayaVertices[vertexIndex] * worldMatrix;
+    // Loop through the number of triangles
+    for (unsigned int i = 0; i < triangleCounts.length(); ++i) {
+        for (int j = 0; j < triangleCounts[i]; ++j) {
+            btVector3 vertices[3];
 
-            // Add vertex to Bullet triangle mesh
-            vertices[j] = btVector3(worldSpaceVertex.x, worldSpaceVertex.y, worldSpaceVertex.z);
+            for (int k = 0; k < 3; ++k) {
+                // Get the vertex index
+                int vertexIndex = triangleVertices[triangleIndex + k];
+
+                // Transform the vertex position to world space
+                MPoint worldSpaceVertex = mayaVertices[vertexIndex] * worldMatrix;
+
+                // Add vertex to Bullet triangle mesh
+            // Convert from Maya's right-handed Y-up to Bullet's left-handed Z-up system
+                vertices[k] = btVector3(static_cast<btScalar>(worldSpaceVertex.x),
+                    static_cast<btScalar>(worldSpaceVertex.z), // Swap Y and Z
+                    static_cast<btScalar>(-worldSpaceVertex.y)); // Invert Z for left-handed system
+            }
+
+            // Add the triangle to the mesh
+            //triMesh->addTriangle(vertices[0], vertices[2], vertices[1]);
+            triMesh->addTriangle(vertices[0], vertices[1], vertices[2]);
+
+            MGlobal::displayInfo(MString("vertex pos of collider ") + vertices->getX() + ", " + vertices->getY() + ", " + vertices->getZ());
+
+            // Move to the next set of vertices
+            triangleIndex += 3;
         }
-
-        // Add the triangle to the mesh
-        triMesh->addTriangle(vertices[0], vertices[1], vertices[2]);
     }
 
     // Create the mesh shape

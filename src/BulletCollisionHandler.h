@@ -34,12 +34,13 @@ class BulletCollisionHandler
         btRigidBody* activeRigidBody;
         btRigidBody* proxyRigidBody;
         std::vector<btRigidBody*> colliders;
+
+        btDiscreteDynamicsWorld* dynamicsWorld;
     private:
         btBroadphaseInterface* broadphase;
         btDefaultCollisionConfiguration* collisionConfiguration;
         btCollisionDispatcher* dispatcher;
         btSequentialImpulseConstraintSolver* solver;
-        btDiscreteDynamicsWorld* dynamicsWorld;
 };
 
 #endif // BULLET_COLLISION_HANDLER_H

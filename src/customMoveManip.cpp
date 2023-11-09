@@ -4,6 +4,53 @@
 #include <maya/MFnPlugin.h>
 #include <maya/MStreamUtils.h>
 
+#include <QtWidgets/qtextedit.h>
+
+
+
+
+
+class MyTickCallback {
+public:
+    static void myTickCallback(btDynamicsWorld* world, btScalar timeStep) {
+        MString msg = "myTickCallback";
+        int numManifolds = world->getDispatcher()->getNumManifolds();
+        for (int i = 0; i < numManifolds; ++i) {
+            btPersistentManifold* contactManifold = world->getDispatcher()->getManifoldByIndexInternal(i);
+            const btCollisionObject* obA = contactManifold->getBody0();
+            const btCollisionObject* obB = contactManifold->getBody1();
+
+            int numContacts = contactManifold->getNumContacts();
+            for (int j = 0; j < numContacts; ++j) {
+                btManifoldPoint& pt = contactManifold->getContactPoint(j);
+                if (pt.getDistance() < 0.f) {
+                    const btVector3& ptA = pt.getPositionWorldOnA();
+                    const btVector3& ptB = pt.getPositionWorldOnB();
+                    const btVector3& normalOnB = pt.m_normalWorldOnB;
+
+                    // Handle the collision point, print it to Maya's console
+                    unsigned long long userPointer0 = reinterpret_cast<unsigned long long>(obA->getUserPointer());
+                    unsigned long long userPointer1 = reinterpret_cast<unsigned long long>(obB->getUserPointer());
+
+                    // Construct the message
+                    MString msg = "Collision detected between: ";
+                    msg += MString() + userPointer0 + " and " + MString() + userPointer1;
+                    MGlobal::displayInfo(msg);
+                }
+            }
+        }
+    }
+};
+
+
+
+
+
+
+
+
+
+
 class CustomMoveManip : public MPxManipContainer
 {
 public:
@@ -40,6 +87,10 @@ CustomMoveManip::CustomMoveManip()
     this->collisionCandidatesFinder.getSceneMFnMeshes();
     this->collisionCandidatesFinder.initializeRTree();
     this->bulletCollisionHandler.createDynamicsWorld();
+
+    //TEMP
+    this->bulletCollisionHandler.updateColliders(this->collisionCandidatesFinder.allSceneMFnMeshes);
+    this->bulletCollisionHandler.dynamicsWorld->setInternalTickCallback(MyTickCallback::myTickCallback);
 }
 
 CustomMoveManip::~CustomMoveManip()
@@ -123,43 +174,49 @@ MStatus CustomMoveManip::doPress()
     return status;
 }
 
-MStatus CustomMoveManip::doDrag()
-{
-    // update world
+MStatus CustomMoveManip::doDrag() {
+    // Update the world.
     this->bulletCollisionHandler.updateWorld(5);
 
+    // Check for collision candidates and update colliders.
+    /*
     std::vector<MFnMesh*> collisionCandidates = this->collisionCandidatesFinder.checkNearbyObjects();
-
     if (!collisionCandidates.empty()) {
         this->bulletCollisionHandler.updateColliders(collisionCandidates);
-    }
+    }*/
 
-    // read translate from manip
+    // Read translation from manip.
     MFnManip3D manipFn(this->fFreePointManipDagPath);
     MPoint currentPosition;
     this->getConverterManipValue(0, currentPosition);
-    MPoint currentTranslation = manipFn.translation(MSpace::kTransform);
+    MPoint currentTranslation = manipFn.translation(MSpace::kWorld);
 
-    // set transform to proxy object
+    // Set transform to proxy object in Bullet's coordinate system.
     this->bulletCollisionHandler.setProxyObjectPosition(
         currentPosition.x + currentTranslation.x, 
-        currentPosition.y + currentTranslation.y,
-        currentPosition.z + currentTranslation.z
+        currentPosition.y + currentTranslation.y,  // Don't invert these here
+        currentPosition.z + currentTranslation.z   // Use Y and Z directly
     );
 
-    // update world 10 times
-    this->bulletCollisionHandler.updateWorld(100);
+    // Update world again for accuracy.
+    this->bulletCollisionHandler.updateWorld(10);
 
-    // read transform from active object
+    // Read transform from active object.
     MMatrix proxyObjectUpdatedMatrix = this->bulletCollisionHandler.getProxyObjectTransformMMatrix();
 
-    // set transform to maya's transform
+    // Apply the transform to Maya's transform, converting it inside the function.
     this->applyProxyTransformToActiveObject(proxyObjectUpdatedMatrix);
+
+    // Debugging information.
+    int numObjects = this->bulletCollisionHandler.dynamicsWorld->getNumCollisionObjects();
+    //MGlobal::displayInfo(MString("---Number of Collision Objects: ") + numObjects);
+
     return MS::kUnknownParameter;
 }
 
+
 void CustomMoveManip::applyProxyTransformToActiveObject(MMatrix matrix) {
-    MGlobal::displayInfo("applyProxyTransformToActiveObject");
+    //MGlobal::displayInfo("applyProxyTransformToActiveObject");
     if (this->bulletCollisionHandler.proxyRigidBody) {
 
         // Get the MFnDagNode of the active object
@@ -172,6 +229,22 @@ void CustomMoveManip::applyProxyTransformToActiveObject(MMatrix matrix) {
         // Get the MFnTransform of the active object using the dagPath
         MFnTransform activeTransform(dagPath);
 
+        // Before setting the transformation, convert Bullet's matrix back to Maya's coordinate system
+        // Swap Y (second column) and Z (third column)
+        double temp;
+        for (int i = 0; i < 4; i++) {
+            temp = matrix(i, 1);
+            matrix(i, 1) = matrix(i, 2);
+            matrix(i, 2) = temp;
+        }
+
+        // Invert the Z values (third column) to switch from left-handed to right-handed
+        for (int i = 0; i < 4; i++) {
+            matrix(i, 2) = -matrix(i, 2);
+        }
+
+        // Now, matrix is in Maya's coordinate system
+
         // Set the transformation matrix of the active object to match the proxy object
         MStatus status = activeTransform.set(MTransformationMatrix(matrix));
         if (!status) {
@@ -180,7 +253,6 @@ void CustomMoveManip::applyProxyTransformToActiveObject(MMatrix matrix) {
         }
     }
 }
-
 
 void CustomMoveManip::drawUI(MHWRender::MUIDrawManager& drawManager, const MHWRender::MFrameContext& frameContext) const
 {
@@ -290,8 +362,6 @@ void CustomMoveManipContext::selectionChanged(void* data)
          }
     }
 }
-
-
 
 //
 // moveManipContext
