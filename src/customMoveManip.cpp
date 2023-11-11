@@ -1,5 +1,6 @@
 #include <CollisionCandidatesFinder.h>
 #include <BulletCollisionHandler.h>
+#include <BulletOpenGLWidget.h>
 
 #include <maya/MFnPlugin.h>
 #include <maya/MStreamUtils.h>
@@ -91,6 +92,7 @@ CustomMoveManip::CustomMoveManip()
     //TEMP
     this->bulletCollisionHandler.updateColliders(this->collisionCandidatesFinder.allSceneMFnMeshes);
     this->bulletCollisionHandler.dynamicsWorld->setInternalTickCallback(MyTickCallback::myTickCallback);
+    showBulletDialog();
 }
 
 CustomMoveManip::~CustomMoveManip()

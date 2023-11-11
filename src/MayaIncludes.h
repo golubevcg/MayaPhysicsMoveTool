@@ -27,5 +27,6 @@
 #include <maya/MEulerRotation.h>
 #include <maya/MFnFreePointTriadManip.h>
 #include <maya/MFnDistanceManip.h>
+#include <maya/MQtUtil.h>
 
 #endif //MAYA_INCLUDES_H

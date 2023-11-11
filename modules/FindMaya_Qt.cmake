@@ -23,8 +23,6 @@ set(MAYA_DIRS_TO_SEARCH
     $ENV{MAYA_LOCATION}
 )
 
-message("LAUNCHEEEED FINDMAYA_QT")
-
 # Find the directory paths to the Qt headers (using the input components list).
 foreach(MAYA_DIR_TO_SEARCH ${MAYA_DIRS_TO_SEARCH})
     file(TO_CMAKE_PATH ${MAYA_DIR_TO_SEARCH} qt_root_dir)

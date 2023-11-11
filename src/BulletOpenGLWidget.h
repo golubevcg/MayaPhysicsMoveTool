@@ -2,14 +2,11 @@
 #define BULLET_OPENGL_WIDGET_H
 
 #include <MayaIncludes.h>
-
-#include <QQDialog>
-#include <QOpenGLWidget>
-#include <QVBoxLayout>
-#include <maya/MQtUtil.h>
+#include <QtWidgets/qdialog.h>
+#include <QtWidgets/qopenglwidget.h>
+#include <QtWidgets/qboxlayout.h>
 
 class BulletOpenGLWidget : public QOpenGLWidget {
-    Q_OBJECT
 public:
     explicit BulletOpenGLWidget(QWidget* parent = nullptr);
 protected:
@@ -19,11 +16,12 @@ protected:
 };
 
 class BulletDialog : public QDialog {
-    Q_OBJECT
 public:
     explicit BulletDialog(QWidget* parent = nullptr);
 private:
     BulletOpenGLWidget* glWidget;
 };
+
+void showBulletDialog();
 
 #endif // BULLET_OPENGL_WIDGET_H

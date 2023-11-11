@@ -1,5 +1,7 @@
 #include "BulletOpenGLWidget.h"
-#include <QOpenGLFunctions>
+//#include <QOpenGLFunctions>
+
+#include <QtOpenGL/qglfunctions.h>
 
 BulletOpenGLWidget::BulletOpenGLWidget(QWidget* parent) : QOpenGLWidget(parent) {
     // Set OpenGL version info
