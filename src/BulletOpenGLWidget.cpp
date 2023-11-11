@@ -26,11 +26,26 @@ void BulletOpenGLWidget::paintGL() {
     QOpenGLFunctions* f = QOpenGLContext::currentContext()->functions();
     f->glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     // Render your Bullet world here
+
+    QOpenGLFunctions* f = QOpenGLContext::currentContext()->functions();
+    f->glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    // Render your Bullet world here
+    if (m_bulletWorld) {
+        // Iterate over Bullet objects and render them
+        for (int i = 0; i < m_bulletWorld->getNumCollisionObjects(); ++i) {
+            btCollisionObject* obj = m_bulletWorld->getCollisionObjectArray()[i];
+            btRigidBody* body = btRigidBody::upcast(obj);
+            if (body && body->getMotionState()) {
+                // Extract position, orientation, etc., and render
+            }
+        }
+    }
 }
 
 BulletDialog::BulletDialog(QWidget* parent) : QDialog(parent) {
     setWindowTitle(tr("Bullet OpenGL"));
-    glWidget = new BulletOpenGLWidget();
+    glWidget = BulletOpenGLWidget::getInstance(this); // Get the singleton instance
     QVBoxLayout* layout = new QVBoxLayout(this);
     layout->addWidget(glWidget);
     setLayout(layout);
@@ -38,9 +53,9 @@ BulletDialog::BulletDialog(QWidget* parent) : QDialog(parent) {
 
 // This is a global function that creates and shows the dialog
 void showBulletDialog() {
-    // Parent the QDialog to Maya's main window
-    QWidget* parent = MQtUtil::mainWindow();
-    BulletDialog* dialog = new BulletDialog(parent);
+    BulletDialog* dialog = new BulletDialog();
     dialog->setAttribute(Qt::WA_DeleteOnClose);
     dialog->show();
 }
+
+

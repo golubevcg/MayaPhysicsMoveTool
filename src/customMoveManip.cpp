@@ -47,11 +47,6 @@ public:
 
 
 
-
-
-
-
-
 class CustomMoveManip : public MPxManipContainer
 {
 public:
