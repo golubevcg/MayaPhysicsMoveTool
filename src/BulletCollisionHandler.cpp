@@ -228,7 +228,7 @@ btRigidBody* BulletCollisionHandler::createFullColliderFromMFnMesh(MFnMesh* mfnM
     btRigidBody* rigidBody = new btRigidBody(rbInfo);
     
     //DEBUG FUNCTION CALL REMOVE LATER
-    //this->createMayaMeshFromBulletRigidBody(rigidBody);
+    this->createMayaMeshFromBulletRigidBody(rigidBody);
 
     return rigidBody;
 }
@@ -275,11 +275,12 @@ btTransform BulletCollisionHandler::getBulletTransformFromMFnMeshTransform(MFnMe
     // Extract the transformation from MFnMesh
     MDagPath dagPath;
     mfnMesh->getPath(dagPath);
-    MFnTransform mfnTransform(dagPath);
-    MTransformationMatrix mTransMatrix = mfnTransform.transformation();
+
+    MGlobal::displayInfo("DAGPATH OBJECT FULL PATH" + dagPath.fullPathName());
+    MMatrix worldMatrix = dagPath.inclusiveMatrix();
 
     // Convert Maya's transformation matrix to Bullet's btTransform
-    btTransform bulletTransform = convertMayaToBulletMatrix(mTransMatrix.asMatrix());
+    btTransform bulletTransform = convertMayaToBulletMatrix(worldMatrix);
 
     return bulletTransform;
 }
@@ -399,6 +400,8 @@ MObject BulletCollisionHandler::createMayaMeshFromBulletRigidBody(btRigidBody* r
 
     // Apply the Maya transform to the created mesh
     MDagPath dagPath;
+    dagPath.pop();
+
     MFnDagNode fnDagNode(newMesh);
     fnDagNode.getPath(dagPath);
     MFnTransform fnTransform(dagPath.transform());
@@ -427,7 +430,8 @@ btTransform BulletCollisionHandler::convertMayaToBulletMatrix(const MMatrix& may
     bulletRotation = conversionMatrix * bulletRotation;
 
     // Apply the conversion to the translation, flipping the Z-axis
-    btVector3 bulletTranslation(mayaMatrix[3][0], mayaMatrix[3][1], -mayaMatrix[3][2]);
+    btVector3 bulletTranslation(mayaMatrix[3][0], mayaMatrix[3][2], -mayaMatrix[3][1]);
+    MGlobal::displayInfo("TRANSLATIONS FROM MAYA MATRIX:" + MString() + mayaMatrix[3][0] + MString("  ") + mayaMatrix[3][1] + MString("  ") + -mayaMatrix[3][2]);
 
     // Create a Bullet transform
     btTransform bulletTransform;
