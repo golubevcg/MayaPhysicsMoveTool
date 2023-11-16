@@ -211,6 +211,7 @@ void BulletCollisionHandler::updateColliders(std::vector<MFnMesh*> collidersMFnM
         this->dynamicsWorld->addRigidBody(rigidBody, 1, 1);
         // Keep a reference to the collider for later removal or other operations
         this->colliders.push_back(rigidBody);
+        MGlobal::displayInfo("Collider was added..." + MString() + mfnMesh->fullPathName());
     }
 }
 
@@ -256,6 +257,10 @@ btRigidBody* BulletCollisionHandler::createFullActiveRigidBodyFromMFnMesh(MFnMes
 
     this->updateActiveObjectProxy(rigidBody->getWorldTransform());
     this->constrainBodies(rigidBody, this->proxyRigidBody);
+    
+    MGlobal::displayInfo("CREATING MESHES FOR ACTIVE OBJECTS");
+    this->createMayaMeshFromBulletRigidBody(rigidBody);
+    //this->createMayaMeshFromBulletRigidBody(this->proxyRigidBody);
 
     return rigidBody;
 }
@@ -340,7 +345,10 @@ MObject BulletCollisionHandler::createMayaMeshFromBulletRigidBody(btRigidBody* r
     }
 
     btCollisionShape* collisionShape = rigidBody->getCollisionShape();
-    btBvhTriangleMeshShape* meshShape = dynamic_cast<btBvhTriangleMeshShape*>(collisionShape);
+
+    //btBvhTriangleMeshShape* meshShape = dynamic_cast<btBvhTriangleMeshShape*>(collisionShape);
+    btBvhTriangleMeshShape* meshShape = static_cast<btBvhTriangleMeshShape*>(collisionShape);
+
 
     if (!meshShape) {
         // Handle the case where the cast fails
@@ -381,7 +389,6 @@ MObject BulletCollisionHandler::createMayaMeshFromBulletRigidBody(btRigidBody* r
             polygonCounts.append(3); // As it's a triangle
         }
     }
-
     // Create Maya mesh
     MFnMesh meshFn;
     MObject newMesh = meshFn.create(points.length(), polygonCounts.length(), points, polygonCounts, polygonConnects, MObject::kNullObj);
@@ -397,7 +404,8 @@ MObject BulletCollisionHandler::createMayaMeshFromBulletRigidBody(btRigidBody* r
     MFnTransform fnTransform(dagPath.transform());
     fnTransform.set(MTransformationMatrix(mayaMatrix));
 
-    return newMesh;
+    MObject temp;
+    return temp;
 }
 
 btTransform BulletCollisionHandler::convertMayaToBulletMatrix(const MMatrix& mayaMatrix) {
