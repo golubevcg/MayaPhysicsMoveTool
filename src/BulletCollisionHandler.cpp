@@ -95,17 +95,7 @@ void BulletCollisionHandler::updateWorld(float framesToUpdate) {
 void BulletCollisionHandler::updateActiveObject(MFnMesh* mesh)
 {
     this->cleanRigidBody(this->activeRigidBody);
-
-    this->activeRigidBody = this->convertMFnMeshToRigidBody(mesh);
-
-    this->dynamicsWorld->addRigidBody(this->activeRigidBody);
-    MString info_msg = "BulletCollisionHandler:active object was updated and added to the dynamicsWorld.";
-    MGlobal::displayInfo(info_msg);
-
-    // setup proxy object
-    this->updateActiveObjectProxy(this->activeRigidBody->getWorldTransform());
-    this->constrainBodies(this->activeRigidBody, this->proxyRigidBody);
-    //constrain them
+    this->activeRigidBody = this->createFullActiveRigidBodyFromMFnMesh(mesh);
 }
 
 void BulletCollisionHandler::updateActiveObjectProxy(const btTransform& startTransform) {
@@ -238,89 +228,82 @@ void BulletCollisionHandler::updateColliders(std::vector<MFnMesh*> collidersMFnM
 
     // Add new colliders based on the provided MFnMeshes
     for (auto& mfnMesh : collidersMFnMeshes) {
-        btCollisionShape* newShape = convertMFnMeshToCollider(mfnMesh);
 
-        // Create a rigid body with a mass of 0 for a static object
-        btDefaultMotionState* motionState = new btDefaultMotionState();
-        btRigidBody::btRigidBodyConstructionInfo rbInfo(0, motionState, newShape, btVector3(0, 0, 0));
-        btRigidBody* rigidBody = new btRigidBody(rbInfo);
+        btRigidBody* rigidBody = this->createFullColliderFromMFnMesh(mfnMesh);
 
         // Add the new rigid body to the dynamics world
         this->dynamicsWorld->addRigidBody(rigidBody);
-
         // Keep a reference to the collider for later removal or other operations
         this->colliders.push_back(rigidBody);
     }
 }
 
-btRigidBody* BulletCollisionHandler::convertMFnMeshToRigidBody(MFnMesh* mfnMesh) {
+btRigidBody* BulletCollisionHandler::createFullColliderFromMFnMesh(MFnMesh* mfnMesh) {
+    // Convert MFnMesh to Bullet Collision Shape
+    btCollisionShape* newShape = this->convertMFnMeshToCollisionShape(mfnMesh);
 
+    // Convert Maya's MMatrix to Bullet's btTransform
+    btTransform bulletTransform = this->getBulletTransformFromMFnMeshTransform(mfnMesh);
+
+    // Create a rigid body with a mass of 0 for a static object
+    btDefaultMotionState* motionState = new btDefaultMotionState(bulletTransform);
+    btRigidBody::btRigidBodyConstructionInfo rbInfo(0, motionState, newShape, btVector3(0, 0, 0));
+    btRigidBody* rigidBody = new btRigidBody(rbInfo);
+    
+    //DEBUG FUNCTION CALL REMOVE LATER
+    this->createMayaMeshFromBulletRigidBody(rigidBody);
+
+    return rigidBody;
+}
+
+btRigidBody* BulletCollisionHandler::createFullActiveRigidBodyFromMFnMesh(MFnMesh* mfnMesh) {
+    btCollisionShape* collisionShape = this->convertMFnMeshToCollisionShape(mfnMesh);
+
+    // Convert Maya's transformation matrix to Bullet's btTransform
+    btTransform bulletTransform = this->getBulletTransformFromMFnMeshTransform(mfnMesh);
+
+    // Define the mass of the rigid body
     float mass = 10;
+    btVector3 localInertia(0, 0, 0);
+    collisionShape->calculateLocalInertia(mass, localInertia);
 
-    // Extract vertices and indices from the MFnMesh
-    MPointArray vertexArray;
-    MIntArray triangleCounts, triangleVertices;
-    mfnMesh->getTriangles(triangleCounts, triangleVertices);
-    mfnMesh->getPoints(vertexArray, MSpace::kWorld);
+    // Create the rigid body with the Bullet transform and collision shape
+    btDefaultMotionState* motionState = new btDefaultMotionState(bulletTransform);
+    btRigidBody::btRigidBodyConstructionInfo rbInfo(mass, motionState, collisionShape, localInertia);
+    btRigidBody* rigidBody = new btRigidBody(rbInfo);
+    rigidBody->setActivationState(DISABLE_DEACTIVATION); // Keep the body always active
 
-    // Create Bullet's triangle mesh
-    btTriangleMesh* triMesh = new btTriangleMesh();
-    for (unsigned int i = 0; i < triangleVertices.length(); i += 3) {
-        MPoint& v0 = vertexArray[triangleVertices[i]];
-        MPoint& v1 = vertexArray[triangleVertices[i + 1]];
-        MPoint& v2 = vertexArray[triangleVertices[i + 2]];
+    // Add rigid body to the dynamics world and set up proxy object
+    this->dynamicsWorld->addRigidBody(rigidBody);
+    MString info_msg = "BulletCollisionHandler: Active object updated and added to the dynamicsWorld.";
+    MGlobal::displayInfo(info_msg);
 
-        btVector3 btV0(v0.x, v0.y, v0.z);
-        btVector3 btV1(v1.x, v1.y, v1.z);
-        btVector3 btV2(v2.x, v2.y, v2.z);
+    this->updateActiveObjectProxy(rigidBody->getWorldTransform());
+    this->constrainBodies(rigidBody, this->proxyRigidBody);
 
-        triMesh->addTriangle(btV0, btV1, btV2);
+    return rigidBody;
+}
+
+btTransform BulletCollisionHandler::getBulletTransformFromMFnMeshTransform(MFnMesh* mfnMesh) {
+    if (!mfnMesh) {
+        // Handle the case where mfnMesh is null
+        // For example, return an identity transform or throw an exception
+        return btTransform::getIdentity();
     }
 
-    // Get the transformation of the MFnMesh
+    // Extract the transformation from MFnMesh
     MDagPath dagPath;
     mfnMesh->getPath(dagPath);
     MFnTransform mfnTransform(dagPath);
     MTransformationMatrix mTransMatrix = mfnTransform.transformation();
 
-    // Extract translation
-    MVector translation = mTransMatrix.getTranslation(MSpace::kWorld);
-    btVector3 btTranslation(translation.x, translation.y, translation.z);
+    // Convert Maya's transformation matrix to Bullet's btTransform
+    btTransform bulletTransform = convertMayaToBulletMatrix(mTransMatrix.asMatrix());
 
-    // Extract rotation
-    MQuaternion rotation = mTransMatrix.rotation();
-    btQuaternion btRotation(rotation.x, rotation.y, rotation.z, rotation.w);
-
-    // Initialize the motion state with the extracted transformation
-    btDefaultMotionState* motionState = new btDefaultMotionState(btTransform(btRotation, btTranslation));
-
-
-    // Use the GImpact mesh shape for the rigid body
-    btGImpactMeshShape* gImpactShape = new btGImpactMeshShape(triMesh);
-    gImpactShape->updateBound();
-
-    // Calculate the local inertia
-    btVector3 localInertia(0, 0, 0);
-    gImpactShape->calculateLocalInertia(mass, localInertia);
-
-    // Create the rigid body
-    btRigidBody::btRigidBodyConstructionInfo rbInfo(mass, motionState, gImpactShape, localInertia);
-    btRigidBody* body = new btRigidBody(rbInfo);
-    body->setActivationState(DISABLE_DEACTIVATION); // Keep the body always active
-    
-
-    return body;
+    return bulletTransform;
 }
 
-btCollisionShape* BulletCollisionHandler::convertMFnMeshToCollider(MFnMesh* mfnMesh) {
-    // Retrieve global transformation matrix
-    MDagPath dagPath;
-    MFnDagNode dagNode(mfnMesh->object());
-    dagNode.getPath(dagPath);
-    dagPath.extendToShape();
-    MFnTransform fnTransform(dagPath.transform());
-    MMatrix worldMatrix = fnTransform.transformationMatrix();
-
+btCollisionShape* BulletCollisionHandler::convertMFnMeshToCollisionShape(MFnMesh* mfnMesh) {
     // Get the points in local space
     MPointArray mayaVertices;
     mfnMesh->getPoints(mayaVertices, MSpace::kObject);
@@ -345,13 +328,15 @@ btCollisionShape* BulletCollisionHandler::convertMFnMeshToCollider(MFnMesh* mfnM
                 int vertexIndex = triangleVertices[triangleIndex + k];
 
                 // Transform the vertex position to world space
-                MPoint worldSpaceVertex = mayaVertices[vertexIndex] * worldMatrix;
+                MPoint worldSpaceVertex = mayaVertices[vertexIndex];
 
                 // Add vertex to Bullet triangle mesh
-            // Convert from Maya's right-handed Y-up to Bullet's left-handed Z-up system
-                vertices[k] = btVector3(static_cast<btScalar>(worldSpaceVertex.x),
+                // Convert from Maya's right-handed Y-up to Bullet's left-handed Z-up system
+                vertices[k] = btVector3(
+                    static_cast<btScalar>(worldSpaceVertex.x),
                     static_cast<btScalar>(worldSpaceVertex.z), // Swap Y and Z
-                    static_cast<btScalar>(-worldSpaceVertex.y)); // Invert Z for left-handed system
+                    static_cast<btScalar>(-worldSpaceVertex.y)
+                ); // Invert Z for left-handed system
             }
 
             // Add the triangle to the mesh
@@ -370,4 +355,133 @@ btCollisionShape* BulletCollisionHandler::convertMFnMeshToCollider(MFnMesh* mfnM
     btBvhTriangleMeshShape* meshShape = new btBvhTriangleMeshShape(triMesh, useQuantizedAABBCompression);
 
     return meshShape;
+}
+
+MObject BulletCollisionHandler::createMayaMeshFromBulletRigidBody(btRigidBody* rigidBody) {
+    if (!rigidBody) {
+        // Handle the case where rigidBody is null
+        return MObject::kNullObj;
+    }
+
+    btCollisionShape* collisionShape = rigidBody->getCollisionShape();
+    btBvhTriangleMeshShape* meshShape = dynamic_cast<btBvhTriangleMeshShape*>(collisionShape);
+
+    if (!meshShape) {
+        // Handle the case where the cast fails
+        return MObject::kNullObj;
+    }
+
+    const btStridingMeshInterface* meshInterface = meshShape->getMeshInterface();
+
+    MFloatPointArray points;
+    MIntArray polygonCounts;
+    MIntArray polygonConnects;
+
+    const btVector3* bulletVertices;
+    const unsigned char* vertexbase;
+    int numverts;
+    PHY_ScalarType type;
+    int stride;
+    const unsigned char* indexbase;
+    int indexstride;
+    int numfaces;
+    PHY_ScalarType indicestype;
+
+    // Accessing vertex and index data from the Bullet mesh
+    for (int partId = 0; partId < meshInterface->getNumSubParts(); partId++) {
+        meshInterface->getLockedReadOnlyVertexIndexBase(&vertexbase, numverts, type, stride, &indexbase, indexstride, numfaces, indicestype, partId);
+        bulletVertices = reinterpret_cast<const btVector3*>(vertexbase);
+
+        for (int i = 0; i < numfaces; i++) {
+            // Assuming the mesh is made of triangles
+            int* indexptr = reinterpret_cast<int*>(const_cast<unsigned char*>(indexbase) + i * indexstride);
+            for (int j = 0; j < 3; j++) {
+                const btVector3& vertex = bulletVertices[*indexptr];
+                // Conversion: Bullet (X, Y, Z) -> Maya (X, Z, -Y)
+                points.append(MFloatPoint(vertex.x(), vertex.z(), -vertex.y()));
+                polygonConnects.append(points.length() - 1);
+                indexptr++;
+            }
+            polygonCounts.append(3); // As it's a triangle
+        }
+    }
+
+    // Create Maya mesh
+    MFnMesh meshFn;
+    MObject newMesh = meshFn.create(points.length(), polygonCounts.length(), points, polygonCounts, polygonConnects, MObject::kNullObj);
+
+    // Extract Bullet's world transform and convert it to Maya's transform
+    btTransform bulletTransform = rigidBody->getWorldTransform();
+    MMatrix mayaMatrix = this->convertBulletToMayaMatrix(bulletTransform);
+
+    // Apply the Maya transform to the created mesh
+    MDagPath dagPath;
+    MFnDagNode fnDagNode(newMesh);
+    fnDagNode.getPath(dagPath);
+    MFnTransform fnTransform(dagPath.transform());
+    fnTransform.set(MTransformationMatrix(mayaMatrix));
+
+    return newMesh;
+}
+
+btTransform BulletCollisionHandler::convertMayaToBulletMatrix(const MMatrix& mayaMatrix) {
+    // Create a conversion matrix that flips the Z-axis
+    btMatrix3x3 conversionMatrix(
+        1.0, 0.0, 0.0,  // First row
+        0.0, 1.0, 0.0,  // Second row
+        0.0, 0.0, -1.0  // Third row - flipping Z-axis
+    );
+
+    // Convert Maya matrix to Bullet format
+    btMatrix3x3 bulletRotation(
+        mayaMatrix[0][0], mayaMatrix[0][1], mayaMatrix[0][2],
+        mayaMatrix[1][0], mayaMatrix[1][1], mayaMatrix[1][2],
+        mayaMatrix[2][0], mayaMatrix[2][1], mayaMatrix[2][2]
+    );
+
+    // Apply the conversion matrix to the rotation
+    bulletRotation = conversionMatrix * bulletRotation;
+
+    // Apply the conversion to the translation, flipping the Z-axis
+    btVector3 bulletTranslation(mayaMatrix[3][0], mayaMatrix[3][1], -mayaMatrix[3][2]);
+
+    // Create a Bullet transform
+    btTransform bulletTransform;
+    bulletTransform.setBasis(bulletRotation);
+    bulletTransform.setOrigin(bulletTranslation);
+
+    return bulletTransform;
+}
+
+MMatrix BulletCollisionHandler::convertBulletToMayaMatrix(const btTransform& bulletTransform) {
+    // Create a reverse conversion matrix (e.g., flipping the Z-axis back)
+    btMatrix3x3 reverseConversionMatrix(
+        1.0, 0.0, 0.0,  // First row
+        0.0, 1.0, 0.0,  // Second row
+        0.0, 0.0, -1.0  // Third row - flipping Z-axis back
+    );
+
+    // Extract rotation and translation from Bullet transform
+    btMatrix3x3 bulletRotation = bulletTransform.getBasis();
+    btVector3 bulletTranslation = bulletTransform.getOrigin();
+
+    // Apply the reverse conversion matrix to the rotation
+    bulletRotation = reverseConversionMatrix * bulletRotation;
+
+    // Adjust the translation (e.g., flipping the Z-axis back)
+    MVector mayaTranslation(bulletTranslation.getX(), bulletTranslation.getY(), -bulletTranslation.getZ());
+
+    // Convert to MMatrix and set translation
+    MMatrix mayaMatrix;
+    for (int i = 0; i < 3; ++i) {
+        for (int j = 0; j < 3; ++j) {
+            mayaMatrix[i][j] = bulletRotation[i][j];
+        }
+    }
+    mayaMatrix[3][0] = mayaTranslation.x;
+    mayaMatrix[3][1] = mayaTranslation.y;
+    mayaMatrix[3][2] = mayaTranslation.z;
+    mayaMatrix[3][3] = 1.0;
+
+    return mayaMatrix;
 }

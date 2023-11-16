@@ -22,14 +22,23 @@ class BulletCollisionHandler
         void updateActiveObjectProxy(const btTransform& startTransform);
         void constrainBodies(btRigidBody* mainBody, btRigidBody* proxyBody);
         void updateColliders(std::vector<MFnMesh*> collidersMFnMeshes);
+        btRigidBody* createFullColliderFromMFnMesh(MFnMesh* mfnMesh);
+        btRigidBody* createFullActiveRigidBodyFromMFnMesh(MFnMesh* mfnMesh);
+
 
         void setProxyObjectPosition(float x, float y, float z);
         MMatrix getProxyObjectTransformMMatrix();
 
-        btRigidBody* convertMFnMeshToRigidBody(MFnMesh* mfnMesh);
-        btCollisionShape* convertMFnMeshToCollider(MFnMesh * mfnMesh);
+        btCollisionShape* convertMFnMeshToCollisionShape(MFnMesh * mfnMesh);
+
+        btTransform convertMayaToBulletMatrix(const MMatrix& mayaMatrix);
+        MMatrix convertBulletToMayaMatrix(const btTransform& bulletTransform);
+
+        btTransform getBulletTransformFromMFnMeshTransform(MFnMesh* mfnMesh);
 
         void updateWorld(float framesToUpdate);
+
+        MObject createMayaMeshFromBulletRigidBody(btRigidBody* rigidBody);
 
         btRigidBody* activeRigidBody;
         btRigidBody* proxyRigidBody;

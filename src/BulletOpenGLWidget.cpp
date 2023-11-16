@@ -25,10 +25,6 @@ void BulletOpenGLWidget::resizeGL(int w, int h) {
 void BulletOpenGLWidget::paintGL() {
     QOpenGLFunctions* f = QOpenGLContext::currentContext()->functions();
     f->glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    // Render your Bullet world here
-
-    QOpenGLFunctions* f = QOpenGLContext::currentContext()->functions();
-    f->glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     // Render your Bullet world here
     if (m_bulletWorld) {

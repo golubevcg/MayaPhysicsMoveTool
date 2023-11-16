@@ -87,7 +87,7 @@ CustomMoveManip::CustomMoveManip()
     //TEMP
     this->bulletCollisionHandler.updateColliders(this->collisionCandidatesFinder.allSceneMFnMeshes);
     this->bulletCollisionHandler.dynamicsWorld->setInternalTickCallback(MyTickCallback::myTickCallback);
-    showBulletDialog();
+    //showBulletDialog();
 }
 
 CustomMoveManip::~CustomMoveManip()
