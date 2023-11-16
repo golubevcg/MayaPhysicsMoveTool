@@ -27,7 +27,7 @@ class BulletCollisionHandler
 
 
         void setProxyObjectPosition(float x, float y, float z);
-        MMatrix getProxyObjectTransformMMatrix();
+        MMatrix getActiveObjectTransformMMatrix();
 
         btCollisionShape* convertMFnMeshToCollisionShape(MFnMesh * mfnMesh);
 

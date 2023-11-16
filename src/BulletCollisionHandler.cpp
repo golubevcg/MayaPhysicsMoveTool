@@ -7,6 +7,7 @@
 #include <BulletCollision/Gimpact/btGImpactShape.h>
 #include <BulletCollision/Gimpact/btGImpactCollisionAlgorithm.h>
 #include <LinearMath/btAlignedObjectArray.h>
+#include <btBulletDynamicsCommon.h>
 
 BulletCollisionHandler::BulletCollisionHandler()
     : broadphase(nullptr),
@@ -115,15 +116,11 @@ void BulletCollisionHandler::updateActiveObjectProxy(const btTransform& startTra
 
     // Create the rigid body
     this->proxyRigidBody = new btRigidBody(rbInfo);
-
-    // Set the body to kinematic
     this->proxyRigidBody->setCollisionFlags(this->proxyRigidBody->getCollisionFlags() | btCollisionObject::CF_KINEMATIC_OBJECT);
-
-    // Disable deactivation
     this->proxyRigidBody->setActivationState(DISABLE_DEACTIVATION);
 
     // Add the body to the world
-    this->dynamicsWorld->addRigidBody(this->proxyRigidBody);
+    this->dynamicsWorld->addRigidBody(this->proxyRigidBody, 1, 1);
 }
 
 void BulletCollisionHandler::setProxyObjectPosition(float x, float y, float z) {
@@ -134,8 +131,6 @@ void BulletCollisionHandler::setProxyObjectPosition(float x, float y, float z) {
 
         // Get the current transform
         btTransform currentTransform = this->proxyRigidBody->getWorldTransform();
-
-        // Set the new position while keeping the current rotation
         currentTransform.setOrigin(newPosition);
 
         // Update the transform of the proxy body
@@ -149,37 +144,18 @@ void BulletCollisionHandler::setProxyObjectPosition(float x, float y, float z) {
     }
 }
 
-MMatrix BulletCollisionHandler::getProxyObjectTransformMMatrix() {
-    if (this->proxyRigidBody) {
+MMatrix BulletCollisionHandler::getActiveObjectTransformMMatrix() {
+    if (this->activeRigidBody) {
         btTransform btTrans;
-        btMotionState* motionState = this->proxyRigidBody->getMotionState();
+        btMotionState* motionState = this->activeRigidBody->getMotionState();
         if (motionState) {
             motionState->getWorldTransform(btTrans);
         }
         else {
-            btTrans = this->proxyRigidBody->getWorldTransform();
+            btTrans = this->activeRigidBody->getWorldTransform();
         }
 
-        // Convert btTransform to MMatrix
-        btScalar btMatrix[16];
-        btTrans.getOpenGLMatrix(btMatrix);
-        MMatrix mayaMatrix;
-        for (int i = 0; i < 4; ++i) {
-            for (int j = 0; j < 4; ++j) {
-                mayaMatrix[i][j] = btMatrix[i * 4 + j];
-            }
-        }
-
-        // Adjust for coordinate system differences between Bullet and Maya
-        // Swap Y and Z axis and negate the new Z axis (which was Y in Bullet)
-        MMatrix coordinateConversionMatrix = MMatrix::identity;
-        coordinateConversionMatrix[1][1] = 0.0;
-        coordinateConversionMatrix[1][2] = 1.0;
-        coordinateConversionMatrix[2][1] = -1.0;
-        coordinateConversionMatrix[2][2] = 0.0;
-
-        // Return the transformed matrix
-        return mayaMatrix * coordinateConversionMatrix;
+        return this->convertBulletToMayaMatrix(btTrans);
     }
 
     // If the proxy object does not exist, return an identity matrix
@@ -232,7 +208,7 @@ void BulletCollisionHandler::updateColliders(std::vector<MFnMesh*> collidersMFnM
         btRigidBody* rigidBody = this->createFullColliderFromMFnMesh(mfnMesh);
 
         // Add the new rigid body to the dynamics world
-        this->dynamicsWorld->addRigidBody(rigidBody);
+        this->dynamicsWorld->addRigidBody(rigidBody, 1, 1);
         // Keep a reference to the collider for later removal or other operations
         this->colliders.push_back(rigidBody);
     }
@@ -251,7 +227,7 @@ btRigidBody* BulletCollisionHandler::createFullColliderFromMFnMesh(MFnMesh* mfnM
     btRigidBody* rigidBody = new btRigidBody(rbInfo);
     
     //DEBUG FUNCTION CALL REMOVE LATER
-    this->createMayaMeshFromBulletRigidBody(rigidBody);
+    //this->createMayaMeshFromBulletRigidBody(rigidBody);
 
     return rigidBody;
 }
@@ -274,7 +250,7 @@ btRigidBody* BulletCollisionHandler::createFullActiveRigidBodyFromMFnMesh(MFnMes
     rigidBody->setActivationState(DISABLE_DEACTIVATION); // Keep the body always active
 
     // Add rigid body to the dynamics world and set up proxy object
-    this->dynamicsWorld->addRigidBody(rigidBody);
+    this->dynamicsWorld->addRigidBody(rigidBody, 1, 1);
     MString info_msg = "BulletCollisionHandler: Active object updated and added to the dynamicsWorld.";
     MGlobal::displayInfo(info_msg);
 
@@ -343,7 +319,7 @@ btCollisionShape* BulletCollisionHandler::convertMFnMeshToCollisionShape(MFnMesh
             //triMesh->addTriangle(vertices[0], vertices[2], vertices[1]);
             triMesh->addTriangle(vertices[0], vertices[1], vertices[2]);
 
-            MGlobal::displayInfo(MString("vertex pos of collider ") + vertices->getX() + ", " + vertices->getY() + ", " + vertices->getZ());
+            //MGlobal::displayInfo(MString("vertex pos of collider ") + vertices->getX() + ", " + vertices->getY() + ", " + vertices->getZ());
 
             // Move to the next set of vertices
             triangleIndex += 3;
@@ -469,7 +445,7 @@ MMatrix BulletCollisionHandler::convertBulletToMayaMatrix(const btTransform& bul
     bulletRotation = reverseConversionMatrix * bulletRotation;
 
     // Adjust the translation (e.g., flipping the Z-axis back)
-    MVector mayaTranslation(bulletTranslation.getX(), bulletTranslation.getY(), -bulletTranslation.getZ());
+    MVector mayaTranslation(bulletTranslation.getX(), -bulletTranslation.getZ(), bulletTranslation.getY());
 
     // Convert to MMatrix and set translation
     MMatrix mayaMatrix;

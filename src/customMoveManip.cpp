@@ -14,8 +14,10 @@
 class MyTickCallback {
 public:
     static void myTickCallback(btDynamicsWorld* world, btScalar timeStep) {
-        MString msg = "myTickCallback";
         int numManifolds = world->getDispatcher()->getNumManifolds();
+        MString infoMsg = MString("numManifolds = ") + numManifolds;
+        MGlobal::displayInfo(infoMsg);
+        /*
         for (int i = 0; i < numManifolds; ++i) {
             btPersistentManifold* contactManifold = world->getDispatcher()->getManifoldByIndexInternal(i);
             const btCollisionObject* obA = contactManifold->getBody0();
@@ -40,6 +42,7 @@ public:
                 }
             }
         }
+        */
     }
 };
 
@@ -63,7 +66,7 @@ public:
     MStatus doDrag() override;
     MStatus doPress() override;
 
-    void applyProxyTransformToActiveObject(MMatrix matrix);
+    void applyTransformToActiveObjectTransform(MMatrix matrix);
 
 private:
     void updateManipLocations(const MObject& node);
@@ -191,63 +194,37 @@ MStatus CustomMoveManip::doDrag() {
     // Set transform to proxy object in Bullet's coordinate system.
     this->bulletCollisionHandler.setProxyObjectPosition(
         currentPosition.x + currentTranslation.x, 
-        currentPosition.y + currentTranslation.y,  // Don't invert these here
-        currentPosition.z + currentTranslation.z   // Use Y and Z directly
+        currentPosition.z + currentTranslation.z,
+        (currentPosition.y + currentTranslation.y)*-1
     );
 
     // Update world again for accuracy.
-    this->bulletCollisionHandler.updateWorld(10);
+    this->bulletCollisionHandler.updateWorld(20);
 
     // Read transform from active object.
-    MMatrix proxyObjectUpdatedMatrix = this->bulletCollisionHandler.getProxyObjectTransformMMatrix();
-
-    // Apply the transform to Maya's transform, converting it inside the function.
-    this->applyProxyTransformToActiveObject(proxyObjectUpdatedMatrix);
+    MMatrix activeObjectUpdatedMatrix = this->bulletCollisionHandler.getActiveObjectTransformMMatrix();
+    this->applyTransformToActiveObjectTransform(activeObjectUpdatedMatrix);
 
     // Debugging information.
-    int numObjects = this->bulletCollisionHandler.dynamicsWorld->getNumCollisionObjects();
+    //int numObjects = this->bulletCollisionHandler.dynamicsWorld->getNumCollisionObjects();
     //MGlobal::displayInfo(MString("---Number of Collision Objects: ") + numObjects);
 
     return MS::kUnknownParameter;
 }
 
 
-void CustomMoveManip::applyProxyTransformToActiveObject(MMatrix matrix) {
-    //MGlobal::displayInfo("applyProxyTransformToActiveObject");
-    if (this->bulletCollisionHandler.proxyRigidBody) {
+void CustomMoveManip::applyTransformToActiveObjectTransform(MMatrix matrix) {
+    // Get the MFnDagNode of the active object
+    MFnDagNode& activeDagNode = this->collisionCandidatesFinder.activeTransformMFnDagNode;
 
-        // Get the MFnDagNode of the active object
-        MFnDagNode& activeDagNode = this->collisionCandidatesFinder.activeTransformMFnDagNode;
+    MDagPath dagPath;
+    activeDagNode.getPath(dagPath);
 
-        // Get the MDagPath of the active object to ensure we're modifying the correct instance
-        MDagPath dagPath;
-        activeDagNode.getPath(dagPath);
-
-        // Get the MFnTransform of the active object using the dagPath
-        MFnTransform activeTransform(dagPath);
-
-        // Before setting the transformation, convert Bullet's matrix back to Maya's coordinate system
-        // Swap Y (second column) and Z (third column)
-        double temp;
-        for (int i = 0; i < 4; i++) {
-            temp = matrix(i, 1);
-            matrix(i, 1) = matrix(i, 2);
-            matrix(i, 2) = temp;
-        }
-
-        // Invert the Z values (third column) to switch from left-handed to right-handed
-        for (int i = 0; i < 4; i++) {
-            matrix(i, 2) = -matrix(i, 2);
-        }
-
-        // Now, matrix is in Maya's coordinate system
-
-        // Set the transformation matrix of the active object to match the proxy object
-        MStatus status = activeTransform.set(MTransformationMatrix(matrix));
-        if (!status) {
-            // Handle the error if the transformation could not be set
-            MGlobal::displayError("Error setting transformation: " + status.errorString());
-        }
+    MFnTransform activeTransform(dagPath);
+    MStatus status = activeTransform.set(MTransformationMatrix(matrix));
+    if (!status) {
+        // Handle the error if the transformation could not be set
+        MGlobal::displayError("Error setting transformation: " + status.errorString());
     }
 }
 
