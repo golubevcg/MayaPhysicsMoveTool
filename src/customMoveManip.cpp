@@ -85,7 +85,7 @@ CustomMoveManip::CustomMoveManip()
     this->bulletCollisionHandler.createDynamicsWorld();
 
     //TEMP
-    this->bulletCollisionHandler.updateColliders(this->collisionCandidatesFinder.allSceneMFnMeshes);
+    //this->bulletCollisionHandler.updateColliders(this->collisionCandidatesFinder.allSceneMFnMeshes);
     this->bulletCollisionHandler.dynamicsWorld->setInternalTickCallback(MyTickCallback::myTickCallback);
     //showBulletDialog();
 }
@@ -176,11 +176,11 @@ MStatus CustomMoveManip::doDrag() {
     this->bulletCollisionHandler.updateWorld(5);
 
     // Check for collision candidates and update colliders.
-    /*
+    /**/
     std::vector<MFnMesh*> collisionCandidates = this->collisionCandidatesFinder.checkNearbyObjects();
     if (!collisionCandidates.empty()) {
         this->bulletCollisionHandler.updateColliders(collisionCandidates);
-    }*/
+    }
 
     // Read translation from manip.
     MFnManip3D manipFn(this->fFreePointManipDagPath);

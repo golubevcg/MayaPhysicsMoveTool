@@ -163,7 +163,8 @@ std::vector<MFnMesh*> CollisionCandidatesFinder::checkNearbyObjects()
 
     // collect all collided objects
     for (const auto& item : result) {
-        if (this->allSceneMFnMeshes[item.second] == this->activeMFnMesh) {  // Exclude the selected mesh itself
+        if (this->allSceneMFnMeshes[item.second]->fullPathName() == this->activeMFnMesh->fullPathName()) {  // Exclude the selected mesh itself
+            MGlobal::displayInfo("Active object skipped, YEEEAH!");
             continue;
         }
 
