@@ -11,8 +11,10 @@ if cmds.pluginInfo(plugin_path, query=True, loaded=True):
 cmds.loadPlugin(plugin_path)
 
 # Specify the test scene path
+test_scene_path = "C:/Users/golub/Documents/maya_viewport_collision_plugin/test/collisions_test_scene_plane_only.mb"
+
 #test_scene_path = "C:/Users/golub/Documents/maya_viewport_collision_plugin/test/collisions_test_scene.mb"
-test_scene_path = "C:/Users/golub/Documents/maya_viewport_collision_plugin/test/collisions_test_scene_no_plane.mb"
+#test_scene_path = "C:/Users/golub/Documents/maya_viewport_collision_plugin/test/collisions_test_scene_no_plane.mb"
 
 
 # Open the test scene

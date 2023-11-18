@@ -17,7 +17,7 @@ public:
         int numManifolds = world->getDispatcher()->getNumManifolds();
         MString infoMsg = MString("numManifolds = ") + numManifolds;
         MGlobal::displayInfo(infoMsg);
-        /*
+
         for (int i = 0; i < numManifolds; ++i) {
             btPersistentManifold* contactManifold = world->getDispatcher()->getManifoldByIndexInternal(i);
             const btCollisionObject* obA = contactManifold->getBody0();
@@ -31,20 +31,31 @@ public:
                     const btVector3& ptB = pt.getPositionWorldOnB();
                     const btVector3& normalOnB = pt.m_normalWorldOnB;
 
+                    // Get the impulse
+                    btScalar appliedImpulse = pt.getAppliedImpulse();
+
+                    // Optionally, you can calculate the power of impact (impulse * velocity)
+                    // Note: This is a simplification and may not be accurate for all cases.
+                    // btScalar impactPower = appliedImpulse * someVelocityMagnitude;
+
                     // Handle the collision point, print it to Maya's console
                     unsigned long long userPointer0 = reinterpret_cast<unsigned long long>(obA->getUserPointer());
                     unsigned long long userPointer1 = reinterpret_cast<unsigned long long>(obB->getUserPointer());
 
+                    // Convert appliedImpulse to MString
+                    MString impulseString = MString() + appliedImpulse;
+
                     // Construct the message
                     MString msg = "Collision detected between: ";
                     msg += MString() + userPointer0 + " and " + MString() + userPointer1;
+                    msg += ", Applied Impulse: " + impulseString;
                     MGlobal::displayInfo(msg);
                 }
             }
         }
-        */
     }
 };
+
 
 
 
@@ -56,7 +67,6 @@ public:
     CustomMoveManip();
     ~CustomMoveManip() override;
 
-
     static void* creator();
     static MStatus initialize();
     MStatus createChildren() override;
@@ -67,11 +77,13 @@ public:
     MStatus doPress() override;
 
     void applyTransformToActiveObjectTransform(MMatrix matrix);
+    void serializeWorldToFile();
 
 private:
     void updateManipLocations(const MObject& node);
 public:
     MDagPath fFreePointManipDagPath;
+    bool created = false;
     static MTypeId id;
 
     CollisionCandidatesFinder collisionCandidatesFinder;
@@ -82,14 +94,7 @@ MTypeId CustomMoveManip::id(0x8001d);
 
 CustomMoveManip::CustomMoveManip()
 {
-    // The constructor must not call createChildren for user-defined manipulators.
-    this->collisionCandidatesFinder.getSceneMFnMeshes();
-    this->collisionCandidatesFinder.initializeRTree();
-    this->bulletCollisionHandler.createDynamicsWorld();
 
-
-    this->bulletCollisionHandler.dynamicsWorld->setInternalTickCallback(MyTickCallback::myTickCallback);
-    //showBulletDialog();
 }
 
 CustomMoveManip::~CustomMoveManip()
@@ -112,6 +117,53 @@ MStatus CustomMoveManip::initialize()
     return stat;
 }
 
+void CustomMoveManip::serializeWorldToFile() {
+
+    btDefaultSerializer* serializer = new btDefaultSerializer();
+    this->bulletCollisionHandler.dynamicsWorld->serialize(serializer);
+
+    FILE* file = fopen("C:/Users/golub/Documents/maya_viewport_collision_plugin/bulletWorld.bullet", "wb");
+    if (file == nullptr) {
+        MGlobal::displayWarning("// Handle error - file opening failed");
+    }
+    else {
+        //FILE* file = fopen("bulletWorld.bullet", "wb");
+        //fwrite(serializer->getBufferPointer(), serializer->getCurrentBufferSize(), 1, file);
+        //fclose(file);
+        //delete serializer;
+
+        MGlobal::displayInfo("Attempting to serialize Bullet world.");
+
+        // Convert pointer to string using stringstream
+        std::stringstream ss;
+        ss << serializer->getBufferPointer();
+        MString bufferPointerStr = ss.str().c_str();
+        MString bufferPointerMsg = "Buffer pointer: " + bufferPointerStr;
+        MGlobal::displayInfo(bufferPointerMsg);
+
+        // Clear stringstream for reuse
+        ss.str("");
+        ss.clear();
+
+        // Convert buffer size to string
+        ss << serializer->getCurrentBufferSize();
+        MString bufferSizeStr = ss.str().c_str();
+        MString bufferSizeMsg = "Buffer size: " + bufferSizeStr;
+        MGlobal::displayInfo(bufferSizeMsg);
+
+
+        // Commenting out the actual write for debugging
+        fwrite(serializer->getBufferPointer(), serializer->getCurrentBufferSize(), 1, file);
+        MGlobal::displayInfo("File 'bulletWorld.bullet' opened successfully.");
+        fclose(file);
+        MGlobal::displayInfo("File 'bulletWorld.bullet' closed successfully.");
+
+
+        delete serializer;
+        MGlobal::displayInfo("Serializer deleted successfully.");
+    }
+}
+
 MStatus CustomMoveManip::createChildren()
 {
     MStatus stat = MStatus::kSuccess;
@@ -119,6 +171,25 @@ MStatus CustomMoveManip::createChildren()
     MVector direction(0.0, 1.0, 0.0);
     this->fFreePointManipDagPath = addFreePointTriadManip("pointManip",
         "freePoint");
+
+    if (this->created == false) {
+        MGlobal::displayWarning("CREATING WORLD AND STUFF");
+        // The constructor must not call createChildren for user-defined manipulators.
+        this->collisionCandidatesFinder.addActiveObject();
+        this->collisionCandidatesFinder.getSceneMFnMeshes();
+        this->collisionCandidatesFinder.initializeRTree();
+
+        this->bulletCollisionHandler.createDynamicsWorld();
+        this->bulletCollisionHandler.dynamicsWorld->setInternalTickCallback(MyTickCallback::myTickCallback);
+        this->bulletCollisionHandler.updateActiveObject(this->collisionCandidatesFinder.activeMFnMesh);
+        this->bulletCollisionHandler.updateColliders(this->collisionCandidatesFinder.allSceneMFnMeshes);
+
+        this->created = true;
+
+        this->bulletCollisionHandler.updateWorld(10);
+        this->serializeWorldToFile();
+
+    }
 
     return stat;
 }
@@ -174,6 +245,8 @@ MStatus CustomMoveManip::doPress()
 }
 
 MStatus CustomMoveManip::doDrag() {
+    // 
+    // 
     // Update the world.
     this->bulletCollisionHandler.updateWorld(5);
 
@@ -191,11 +264,14 @@ MStatus CustomMoveManip::doDrag() {
     MPoint currentTranslation = manipFn.translation(MSpace::kWorld);
 
     // Set transform to proxy object in Bullet's coordinate system.
+
     this->bulletCollisionHandler.setProxyObjectPosition(
         currentPosition.x + currentTranslation.x, 
         currentPosition.z + currentTranslation.z,
         (currentPosition.y + currentTranslation.y)*-1
     );
+    /*
+    */
 
     // Update world again for accuracy.
     this->bulletCollisionHandler.updateWorld(20);
@@ -219,6 +295,18 @@ void CustomMoveManip::applyTransformToActiveObjectTransform(MMatrix matrix) {
     MDagPath dagPath;
     activeDagNode.getPath(dagPath);
 
+    MGlobal::displayInfo("SETTING TRANSFORM TO ACTIVE OBJECT:" + dagPath.fullPathName());
+    std::ostringstream oss;
+    oss << "MMatrix: \n";
+    for (int i = 0; i < 4; ++i) {
+        for (int j = 0; j < 4; ++j) {
+            oss << matrix[i][j] << " ";
+        }
+        oss << "\n";
+    }
+
+    MGlobal::displayInfo(MString(oss.str().c_str()));
+    
     MFnTransform activeTransform(dagPath);
     MStatus status = activeTransform.set(MTransformationMatrix(matrix));
     if (!status) {
@@ -330,10 +418,7 @@ void CustomMoveManipContext::selectionChanged(void* data)
                     " object: " + dependNodeFn.name());
             }
 
-            manipulator->collisionCandidatesFinder.addActiveObject();
-            manipulator->bulletCollisionHandler.updateActiveObject(manipulator->collisionCandidatesFinder.activeMFnMesh);
-            //TEMP
-            manipulator->bulletCollisionHandler.updateColliders(manipulator->collisionCandidatesFinder.allSceneMFnMeshes);
+
         }
     }
 }

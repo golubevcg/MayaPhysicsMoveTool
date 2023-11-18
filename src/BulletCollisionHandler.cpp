@@ -1,4 +1,5 @@
 // MayaToBulletUtils.cpp
+#include <sstream>
 
 #include <string>
 #include <MayaIncludes.h>
@@ -8,6 +9,7 @@
 #include <BulletCollision/Gimpact/btGImpactCollisionAlgorithm.h>
 #include <LinearMath/btAlignedObjectArray.h>
 #include <btBulletDynamicsCommon.h>
+
 
 BulletCollisionHandler::BulletCollisionHandler()
     : broadphase(nullptr),
@@ -39,7 +41,7 @@ void BulletCollisionHandler::createDynamicsWorld() {
 
     // Create the dynamics world
     this->dynamicsWorld = new btDiscreteDynamicsWorld(dispatcher, broadphase, solver, collisionConfiguration);
-    this->dynamicsWorld->setGravity(btVector3(0, 0, 0));
+    this->dynamicsWorld->setGravity(btVector3(0, 0, -10));
 }
 
 void BulletCollisionHandler::deleteDynamicsWorld() {
@@ -91,6 +93,13 @@ void BulletCollisionHandler::updateWorld(float framesToUpdate) {
 
     // Update the dynamics world by the deltaTime
     this->dynamicsWorld->stepSimulation(deltaTime, maxSubSteps, fixedTimeStep);
+
+    //TEMP
+    const btTransform& trans = this->activeRigidBody->getWorldTransform();
+    const btVector3& pos = trans.getOrigin();
+    std::ostringstream oss;
+    oss << "RigidBody Position: X=" << pos.getX() << " Y=" << pos.getY() << " Z=" << pos.getZ();
+    MGlobal::displayInfo(MString(oss.str().c_str()));
 }
 
 void BulletCollisionHandler::updateActiveObject(MFnMesh* mesh)
@@ -116,11 +125,11 @@ void BulletCollisionHandler::updateActiveObjectProxy(const btTransform& startTra
 
     // Create the rigid body
     this->proxyRigidBody = new btRigidBody(rbInfo);
-    this->proxyRigidBody->setCollisionFlags(this->proxyRigidBody->getCollisionFlags() | btCollisionObject::CF_KINEMATIC_OBJECT);
+    this->proxyRigidBody->setCollisionFlags(btCollisionObject::CF_KINEMATIC_OBJECT);
     this->proxyRigidBody->setActivationState(DISABLE_DEACTIVATION);
 
     // Add the body to the world
-    this->dynamicsWorld->addRigidBody(this->proxyRigidBody, 1, 1);
+    this->dynamicsWorld->addRigidBody(this->proxyRigidBody, 1, 2);
 }
 
 void BulletCollisionHandler::setProxyObjectPosition(float x, float y, float z) {
@@ -222,11 +231,32 @@ btRigidBody* BulletCollisionHandler::createFullColliderFromMFnMesh(MFnMesh* mfnM
     // Convert Maya's MMatrix to Bullet's btTransform
     btTransform bulletTransform = this->getBulletTransformFromMFnMeshTransform(mfnMesh);
 
+    //***************************************************
+    //**********************TEMP*****************************
+    // Assuming bulletTransform is your btTransform object
+    btQuaternion rotation = bulletTransform.getRotation();
+    btVector3 position = bulletTransform.getOrigin();
+    // Convert position and rotation to strings
+    MString positionStr = "Position: X=" + MString() + position.getX() +
+        " Y=" + MString() + position.getY() +
+        " Z=" + MString() + position.getZ();
+
+    MString rotationStr = "Rotation: X=" + MString() + rotation.getX() +
+        " Y=" + MString() + rotation.getY() +
+        " Z=" + MString() + rotation.getZ() +
+        " W=" + MString() + rotation.getW();
+    // Combine the strings
+    MString transformStr = positionStr + ", " + rotationStr;
+
+    // Print the transformation details to Maya's console
+    MGlobal::displayInfo(transformStr);
+    //**********************TEMP*****************************
+
     // Create a rigid body with a mass of 0 for a static object
     btDefaultMotionState* motionState = new btDefaultMotionState(bulletTransform);
     btRigidBody::btRigidBodyConstructionInfo rbInfo(0, motionState, newShape, btVector3(0, 0, 0));
     btRigidBody* rigidBody = new btRigidBody(rbInfo);
-    
+
     //DEBUG FUNCTION CALL REMOVE LATER
     this->createMayaMeshFromBulletRigidBody(rigidBody);
 
@@ -240,7 +270,7 @@ btRigidBody* BulletCollisionHandler::createFullActiveRigidBodyFromMFnMesh(MFnMes
     btTransform bulletTransform = this->getBulletTransformFromMFnMeshTransform(mfnMesh);
 
     // Define the mass of the rigid body
-    float mass = 10;
+    float mass = 100;
     btVector3 localInertia(0, 0, 0);
     collisionShape->calculateLocalInertia(mass, localInertia);
 
@@ -248,18 +278,18 @@ btRigidBody* BulletCollisionHandler::createFullActiveRigidBodyFromMFnMesh(MFnMes
     btDefaultMotionState* motionState = new btDefaultMotionState(bulletTransform);
     btRigidBody::btRigidBodyConstructionInfo rbInfo(mass, motionState, collisionShape, localInertia);
     btRigidBody* rigidBody = new btRigidBody(rbInfo);
-    rigidBody->setActivationState(DISABLE_DEACTIVATION); // Keep the body always active
+    //rigidBody->setActivationState(DISABLE_DEACTIVATION); // Keep the body always active
 
     // Add rigid body to the dynamics world and set up proxy object
     this->dynamicsWorld->addRigidBody(rigidBody, 1, 1);
     MString info_msg = "BulletCollisionHandler: Active object updated and added to the dynamicsWorld.";
     MGlobal::displayInfo(info_msg);
 
-    this->updateActiveObjectProxy(rigidBody->getWorldTransform());
-    this->constrainBodies(rigidBody, this->proxyRigidBody);
+    //this->updateActiveObjectProxy(rigidBody->getWorldTransform());
+    //this->constrainBodies(rigidBody, this->proxyRigidBody);
     
-    MGlobal::displayInfo("CREATING MESHES FOR ACTIVE OBJECTS");
-    this->createMayaMeshFromBulletRigidBody(rigidBody);
+    //MGlobal::displayInfo("CREATING MESHES FOR ACTIVE OBJECTS");
+    //this->createMayaMeshFromBulletRigidBody(rigidBody);
     //this->createMayaMeshFromBulletRigidBody(this->proxyRigidBody);
 
     return rigidBody;

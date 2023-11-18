@@ -83,6 +83,14 @@ MStatus CollisionCandidatesFinder::getSceneMFnMeshes()
             continue;
         }
 
+
+        //TEMP REMOVE ACTIVE OBJECT
+        if (fnMesh->fullPathName() == this->activeMFnMesh->fullPathName()) {
+            MGlobal::displayInfo("*****Active mesh skipped" + MString() + this->activeMFnMesh->fullPathName());
+            continue;
+        }
+
+
         MBoundingBox boundingBox = fnMesh->boundingBox(&status);
         if (status != MS::kSuccess) {
             MGlobal::displayError("Failed to get bounding box");
