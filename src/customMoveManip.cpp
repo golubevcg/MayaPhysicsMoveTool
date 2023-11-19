@@ -9,44 +9,14 @@
 
 
 
-
-
 class MyTickCallback {
 public:
     static void myTickCallback(btDynamicsWorld* world, btScalar timeStep) {
         int numManifolds = world->getDispatcher()->getNumManifolds();
         MString infoMsg = MString("numManifolds = ") + numManifolds;
         MGlobal::displayInfo(infoMsg);
-        /*
-        for (int i = 0; i < numManifolds; ++i) {
-            btPersistentManifold* contactManifold = world->getDispatcher()->getManifoldByIndexInternal(i);
-            const btCollisionObject* obA = contactManifold->getBody0();
-            const btCollisionObject* obB = contactManifold->getBody1();
-
-            int numContacts = contactManifold->getNumContacts();
-            for (int j = 0; j < numContacts; ++j) {
-                btManifoldPoint& pt = contactManifold->getContactPoint(j);
-                if (pt.getDistance() < 0.f) {
-                    const btVector3& ptA = pt.getPositionWorldOnA();
-                    const btVector3& ptB = pt.getPositionWorldOnB();
-                    const btVector3& normalOnB = pt.m_normalWorldOnB;
-
-                    // Handle the collision point, print it to Maya's console
-                    unsigned long long userPointer0 = reinterpret_cast<unsigned long long>(obA->getUserPointer());
-                    unsigned long long userPointer1 = reinterpret_cast<unsigned long long>(obB->getUserPointer());
-
-                    // Construct the message
-                    MString msg = "Collision detected between: ";
-                    msg += MString() + userPointer0 + " and " + MString() + userPointer1;
-                    MGlobal::displayInfo(msg);
-                }
-            }
-        }
-        */
     }
 };
-
-
 
 
 
@@ -202,15 +172,7 @@ MStatus CustomMoveManip::doDrag() {
     this->getConverterManipValue(0, currentPosition);
     MPoint currentTranslation = manipFn.translation(MSpace::kWorld);
 
-    /*
-    // Set transform to proxy object in Bullet's coordinate system.
-    this->bulletCollisionHandler.setProxyObjectPosition(
-        currentPosition.x + currentTranslation.x, 
-        currentPosition.z + currentTranslation.z,
-        (currentPosition.y + currentTranslation.y)*-1
-    );*/
 
-    //TEST WITH LINEAR VELOCITY
     // Get the current position of the rigid body
     btVector3 currentPos = this->bulletCollisionHandler.activeRigidBody->getWorldTransform().getOrigin();
     // Calculate target position (convert to Bullet's coordinate system)
@@ -225,7 +187,6 @@ MStatus CustomMoveManip::doDrag() {
     // Apply this velocity to the rigid body
     MGlobal::displayInfo("CALCULATED VELOCITY VALUE:" + MString() + requiredVelocity.getX() + requiredVelocity.getY() + requiredVelocity.getZ());
     this->bulletCollisionHandler.activeRigidBody->setLinearVelocity(requiredVelocity*0.01);
-
 
     // Update world again for accuracy.
     this->bulletCollisionHandler.updateWorld(50);
