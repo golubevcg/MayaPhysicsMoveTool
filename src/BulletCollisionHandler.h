@@ -29,7 +29,8 @@ class BulletCollisionHandler
         void setProxyObjectPosition(float x, float y, float z);
         MMatrix getActiveObjectTransformMMatrix();
 
-        btCollisionShape* convertMFnMeshToCollisionShape(MFnMesh * mfnMesh);
+        btCollisionShape* convertMFnMeshToActiveCollisionShape(MFnMesh* mfnMesh);
+        btCollisionShape* convertMFnMeshToStaticCollisionShape(MFnMesh * mfnMesh);
 
         btTransform convertMayaToBulletMatrix(const MMatrix& mayaMatrix);
         MMatrix convertBulletToMayaMatrix(const btTransform& bulletTransform);

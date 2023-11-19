@@ -65,6 +65,7 @@ public:
     void drawUI(MHWRender::MUIDrawManager&, const MHWRender::MFrameContext&) const override;
     MStatus doDrag() override;
     MStatus doPress() override;
+    bool created = false;
 
     void applyTransformToActiveObjectTransform(MMatrix matrix);
 
@@ -82,14 +83,23 @@ MTypeId CustomMoveManip::id(0x8001d);
 
 CustomMoveManip::CustomMoveManip()
 {
-    // The constructor must not call createChildren for user-defined manipulators.
-    this->collisionCandidatesFinder.getSceneMFnMeshes();
-    this->collisionCandidatesFinder.initializeRTree();
-    this->bulletCollisionHandler.createDynamicsWorld();
+    if (this->created != true) {
+        // The constructor must not call createChildren for user-defined manipulators.
+        this->collisionCandidatesFinder.addActiveObject();
 
+        this->collisionCandidatesFinder.getSceneMFnMeshes();
+        this->collisionCandidatesFinder.initializeRTree();
+        this->bulletCollisionHandler.createDynamicsWorld();
 
-    this->bulletCollisionHandler.dynamicsWorld->setInternalTickCallback(MyTickCallback::myTickCallback);
-    //showBulletDialog();
+        this->bulletCollisionHandler.dynamicsWorld->setInternalTickCallback(MyTickCallback::myTickCallback);
+
+        this->bulletCollisionHandler.updateActiveObject(this->collisionCandidatesFinder.activeMFnMesh);
+        this->bulletCollisionHandler.updateColliders(this->collisionCandidatesFinder.allSceneMFnMeshes);
+        //showBulletDialog();
+
+        this->created = true;
+    }
+
 }
 
 CustomMoveManip::~CustomMoveManip()
@@ -198,7 +208,7 @@ MStatus CustomMoveManip::doDrag() {
     );
 
     // Update world again for accuracy.
-    this->bulletCollisionHandler.updateWorld(20);
+    this->bulletCollisionHandler.updateWorld(50);
 
     // Read transform from active object.
     MMatrix activeObjectUpdatedMatrix = this->bulletCollisionHandler.getActiveObjectTransformMMatrix();
@@ -208,6 +218,8 @@ MStatus CustomMoveManip::doDrag() {
     //int numObjects = this->bulletCollisionHandler.dynamicsWorld->getNumCollisionObjects();
     //MGlobal::displayInfo(MString("---Number of Collision Objects: ") + numObjects);
 
+    btVector3 transformV = this->bulletCollisionHandler.activeRigidBody->getWorldTransform().getOrigin();
+    MGlobal::displayInfo("======ACTIVE BODY POS:" + MString() + transformV.getX() + transformV.getY() + transformV.getZ());
     return MS::kUnknownParameter;
 }
 
@@ -330,10 +342,7 @@ void CustomMoveManipContext::selectionChanged(void* data)
                     " object: " + dependNodeFn.name());
             }
 
-            manipulator->collisionCandidatesFinder.addActiveObject();
-            manipulator->bulletCollisionHandler.updateActiveObject(manipulator->collisionCandidatesFinder.activeMFnMesh);
-            //TEMP
-            manipulator->bulletCollisionHandler.updateColliders(manipulator->collisionCandidatesFinder.allSceneMFnMeshes);
+
         }
     }
 }

@@ -89,6 +89,12 @@ MStatus CollisionCandidatesFinder::getSceneMFnMeshes()
             continue;
         }
 
+        //TEMP REMOVE ACTIVE OBJECT
+        if (fnMesh->fullPathName() == this->activeMFnMesh->fullPathName()) {
+            MGlobal::displayInfo("*****Active mesh skipped" + MString() + this->activeMFnMesh->fullPathName());
+            continue;
+        }
+
         this->allSceneMFnMeshes.push_back(fnMesh);
     }
 
