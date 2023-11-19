@@ -259,7 +259,7 @@ btRigidBody* BulletCollisionHandler::createFullActiveRigidBodyFromMFnMesh(MFnMes
 
     // Define the mass of the rigid body
     float mass = 1;
-    btVector3 localInertia(10, 10, 10);
+    btVector3 localInertia(0, 0, 0);
     collisionShape->calculateLocalInertia(mass, localInertia);
 
     // Create the rigid body with the Bullet transform and collision shape
@@ -267,11 +267,11 @@ btRigidBody* BulletCollisionHandler::createFullActiveRigidBodyFromMFnMesh(MFnMes
     btRigidBody::btRigidBodyConstructionInfo rbInfo(mass, motionState, collisionShape, localInertia);
     btRigidBody* rigidBody = new btRigidBody(rbInfo);
 
-    rigidBody->setRestitution(0);
-    rigidBody->setFriction(1);
+    //rigidBody->setRestitution(0);
+    //rigidBody->setFriction(1);
     //rigidBody->setRollingFriction(1);
     //rigidBody->setSpinningFriction(1);
-    rigidBody->setDamping(5, 5);
+    //rigidBody->setDamping(5, 5);
     //rigidBody->setContactStiffnessAndDamping(1, 1);
 
     rigidBody->setCollisionFlags(rigidBody->getCollisionFlags() | btCollisionObject::CF_DYNAMIC_OBJECT);
@@ -282,8 +282,8 @@ btRigidBody* BulletCollisionHandler::createFullActiveRigidBodyFromMFnMesh(MFnMes
     MString info_msg = "BulletCollisionHandler: Active object updated and added to the dynamicsWorld.";
     MGlobal::displayInfo(info_msg);
 
-    this->updateActiveObjectProxy(rigidBody->getWorldTransform());
-    this->constrainBodies(rigidBody, this->proxyRigidBody);
+    //this->updateActiveObjectProxy(rigidBody->getWorldTransform());
+    //this->constrainBodies(rigidBody, this->proxyRigidBody);
     
     MGlobal::displayInfo("CREATING MESHES FOR ACTIVE OBJECTS");
     //this->createMayaMeshFromBulletRigidBody(rigidBody);

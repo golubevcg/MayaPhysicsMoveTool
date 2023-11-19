@@ -202,12 +202,30 @@ MStatus CustomMoveManip::doDrag() {
     this->getConverterManipValue(0, currentPosition);
     MPoint currentTranslation = manipFn.translation(MSpace::kWorld);
 
+    /*
     // Set transform to proxy object in Bullet's coordinate system.
     this->bulletCollisionHandler.setProxyObjectPosition(
         currentPosition.x + currentTranslation.x, 
         currentPosition.z + currentTranslation.z,
         (currentPosition.y + currentTranslation.y)*-1
+    );*/
+
+    //TEST WITH LINEAR VELOCITY
+    // Get the current position of the rigid body
+    btVector3 currentPos = this->bulletCollisionHandler.activeRigidBody->getWorldTransform().getOrigin();
+    // Calculate target position (convert to Bullet's coordinate system)
+    btVector3 targetPos(
+        currentPosition.x + currentTranslation.x,
+        currentPosition.z + currentTranslation.z,
+        -(currentPosition.y + currentTranslation.y)
     );
+    float timeStep = 1.0f / 60.0f;
+    // Calculate the required velocity to reach the target position in one time step
+    btVector3 requiredVelocity = (targetPos - currentPos) / timeStep;
+    // Apply this velocity to the rigid body
+    MGlobal::displayInfo("CALCULATED VELOCITY VALUE:" + MString() + requiredVelocity.getX() + requiredVelocity.getY() + requiredVelocity.getZ());
+    this->bulletCollisionHandler.activeRigidBody->setLinearVelocity(requiredVelocity*0.01);
+
 
     // Update world again for accuracy.
     this->bulletCollisionHandler.updateWorld(50);
