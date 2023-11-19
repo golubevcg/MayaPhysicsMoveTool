@@ -99,52 +99,6 @@ void BulletCollisionHandler::updateActiveObject(MFnMesh* mesh)
     this->activeRigidBody = this->createFullActiveRigidBodyFromMFnMesh(mesh);
 }
 
-void BulletCollisionHandler::updateActiveObjectProxy(const btTransform& startTransform) {
-    this->cleanRigidBody(this->proxyRigidBody);
-
-    // Assume a box shape for the proxy object for simplicity
-    btCollisionShape* shape = new btBoxShape(btVector3(1, 1, 1)); // A 1m cube
-
-    // Kinematic objects have zero mass
-    btScalar mass(0.f);
-
-    // Motion state with the starting transform
-    btDefaultMotionState* motionState = new btDefaultMotionState(startTransform);
-
-    // Rigidbody construction info
-    btRigidBody::btRigidBodyConstructionInfo rbInfo(mass, motionState, shape);
-
-    // Create the rigid body
-    this->proxyRigidBody = new btRigidBody(rbInfo);
-    this->proxyRigidBody->setCollisionFlags(this->proxyRigidBody->getCollisionFlags() | btCollisionObject::CF_KINEMATIC_OBJECT);
-    this->proxyRigidBody->setActivationState(DISABLE_DEACTIVATION);
-
-    // Add the body to the world
-    //this->dynamicsWorld->addRigidBody(this->proxyRigidBody, 1, 2);
-    this->dynamicsWorld->addRigidBody(this->proxyRigidBody, btBroadphaseProxy::KinematicFilter, 2);
-}
-
-void BulletCollisionHandler::setProxyObjectPosition(float x, float y, float z) {
-    // Check if the proxy body exists
-    if (this->proxyRigidBody) {
-        // Create a new position vector from the input floats
-        btVector3 newPosition(x, y, z);
-
-        // Get the current transform
-        btTransform currentTransform = this->proxyRigidBody->getWorldTransform();
-        currentTransform.setOrigin(newPosition);
-
-        // Update the transform of the proxy body
-        this->proxyRigidBody->setWorldTransform(currentTransform);
-
-        // For kinematic objects, you also need to update the motion state
-        btMotionState* motionState = this->proxyRigidBody->getMotionState();
-        if (motionState) {
-            motionState->setWorldTransform(currentTransform);
-        }
-    }
-}
-
 MMatrix BulletCollisionHandler::getActiveObjectTransformMMatrix() {
     if (this->activeRigidBody) {
         btTransform btTrans;
@@ -173,24 +127,6 @@ void BulletCollisionHandler::cleanRigidBody(btRigidBody* body) {
         delete body;
         body = nullptr; // Ensure the pointer is reset to nullptr after deletion
     }
-}
-
-void BulletCollisionHandler::constrainBodies(btRigidBody* mainBody, btRigidBody* proxyBody) {
-    // Create a point-to-point constraint between the two bodies
-    // This will keep them at the same location, but allow for rotations.
-    //btTypedConstraint* constraint = new btPoint2PointConstraint(*mainBody, *proxyBody, btVector3(0, 0, 0), btVector3(0, 0, 0));
-
-    /**/
-    // Create transformation frames for the constraint
-    btTransform frameInMain = btTransform::getIdentity();
-    btTransform frameInProxy = btTransform::getIdentity();
-
-    // Create a Generic 6-DOF constraint between the two bodies
-    btGeneric6DofConstraint* constraint = new btGeneric6DofConstraint(*mainBody, *proxyBody, frameInMain, frameInProxy, true);
-    
-
-    // Add the constraint to the world
-    this->dynamicsWorld->addConstraint(constraint, true);
 }
 
 void BulletCollisionHandler::updateColliders(std::vector<MFnMesh*> collidersMFnMeshes)
@@ -227,12 +163,16 @@ void BulletCollisionHandler::updateColliders(std::vector<MFnMesh*> collidersMFnM
 btRigidBody* BulletCollisionHandler::createFullColliderFromMFnMesh(MFnMesh* mfnMesh) {
     // Convert MFnMesh to Bullet Collision Shape
     btCollisionShape* newShape = this->convertMFnMeshToStaticCollisionShape(mfnMesh);
-
     // Convert Maya's MMatrix to Bullet's btTransform
+    // 
     //btTransform bulletTransform = this->getBulletTransformFromMFnMeshTransform(mfnMesh);
-    btTransform bulletTransform = btTransform();
+
+    /*
+    btTransform bulletTransform;
     bulletTransform.setIdentity();
     bulletTransform.setRotation(btQuaternion(btVector3(0.0, 0.0, 0.0), 0));
+    */
+    btTransform bulletTransform = btTransform::getIdentity();
 
     // Create a rigid body with a mass of 0 for a static object
     btDefaultMotionState* motionState = new btDefaultMotionState(bulletTransform);
@@ -240,7 +180,7 @@ btRigidBody* BulletCollisionHandler::createFullColliderFromMFnMesh(MFnMesh* mfnM
     btRigidBody* rigidBody = new btRigidBody(rbInfo);
 
     rigidBody->setCollisionFlags(rigidBody->getCollisionFlags() | btCollisionObject::CF_STATIC_OBJECT);
-    
+    rigidBody->setActivationState(DISABLE_DEACTIVATION);
     //DEBUG FUNCTION CALL REMOVE LATER
     //MGlobal::displayInfo("CREATING COLLIDER FOR MESH (" + MString() + mfnMesh->fullPathName() + MString(")..."));
     //this->createMayaMeshFromBulletRigidBody(rigidBody);
@@ -316,6 +256,7 @@ btCollisionShape* BulletCollisionHandler::convertMFnMeshToStaticCollisionShape(M
     // Get the points in local space
     MPointArray mayaVertices;
     mfnMesh->getPoints(mayaVertices, MSpace::kWorld);
+    //mfnMesh->getPoints(mayaVertices, MSpace::kObject);
 
     // Create the Bullet triangle mesh
     btTriangleMesh* triMesh = new btTriangleMesh();
