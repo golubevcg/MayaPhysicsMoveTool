@@ -89,10 +89,12 @@ CustomMoveManip::CustomMoveManip()
 
         this->collisionCandidatesFinder.getSceneMFnMeshes();
         this->collisionCandidatesFinder.initializeRTree();
+
         this->bulletCollisionHandler.createDynamicsWorld();
 
         this->bulletCollisionHandler.dynamicsWorld->setInternalTickCallback(MyTickCallback::myTickCallback);
 
+        MGlobal::displayInfo("Amount of scene MFnMeshes:" + MString() + this->collisionCandidatesFinder.allSceneMFnMeshes.size());
         this->bulletCollisionHandler.updateActiveObject(this->collisionCandidatesFinder.activeMFnMesh);
         this->bulletCollisionHandler.updateColliders(this->collisionCandidatesFinder.allSceneMFnMeshes);
         //showBulletDialog();

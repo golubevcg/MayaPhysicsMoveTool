@@ -120,7 +120,8 @@ void BulletCollisionHandler::updateActiveObjectProxy(const btTransform& startTra
     this->proxyRigidBody->setActivationState(DISABLE_DEACTIVATION);
 
     // Add the body to the world
-    this->dynamicsWorld->addRigidBody(this->proxyRigidBody, 1, 2);
+    //this->dynamicsWorld->addRigidBody(this->proxyRigidBody, 1, 2);
+    this->dynamicsWorld->addRigidBody(this->proxyRigidBody, btBroadphaseProxy::KinematicFilter, 2);
 }
 
 void BulletCollisionHandler::setProxyObjectPosition(float x, float y, float z) {
@@ -177,10 +178,16 @@ void BulletCollisionHandler::cleanRigidBody(btRigidBody* body) {
 void BulletCollisionHandler::constrainBodies(btRigidBody* mainBody, btRigidBody* proxyBody) {
     // Create a point-to-point constraint between the two bodies
     // This will keep them at the same location, but allow for rotations.
-    btTypedConstraint* constraint = new btPoint2PointConstraint(*mainBody, *proxyBody, btVector3(0, 0, 0), btVector3(0, 0, 0));
+    //btTypedConstraint* constraint = new btPoint2PointConstraint(*mainBody, *proxyBody, btVector3(0, 0, 0), btVector3(0, 0, 0));
 
-    // Optionally set some constraint parameters
-    // static_cast<btPoint2PointConstraint*>(constraint)->m_setting.m_impulseClamp = 10; // example parameter
+    /**/
+    // Create transformation frames for the constraint
+    btTransform frameInMain = btTransform::getIdentity();
+    btTransform frameInProxy = btTransform::getIdentity();
+
+    // Create a Generic 6-DOF constraint between the two bodies
+    btGeneric6DofConstraint* constraint = new btGeneric6DofConstraint(*mainBody, *proxyBody, frameInMain, frameInProxy, true);
+    
 
     // Add the constraint to the world
     this->dynamicsWorld->addConstraint(constraint, true);
@@ -208,7 +215,9 @@ void BulletCollisionHandler::updateColliders(std::vector<MFnMesh*> collidersMFnM
         btRigidBody* rigidBody = this->createFullColliderFromMFnMesh(mfnMesh);
 
         // Add the new rigid body to the dynamics world
-        this->dynamicsWorld->addRigidBody(rigidBody, 1, 1);
+        //this->dynamicsWorld->addRigidBody(rigidBody, 1, 1);
+        this->dynamicsWorld->addRigidBody(rigidBody, btBroadphaseProxy::StaticFilter, btBroadphaseProxy::AllFilter);
+
         // Keep a reference to the collider for later removal or other operations
         this->colliders.push_back(rigidBody);
         MGlobal::displayInfo("Collider was added..." + MString() + mfnMesh->fullPathName());
@@ -220,7 +229,10 @@ btRigidBody* BulletCollisionHandler::createFullColliderFromMFnMesh(MFnMesh* mfnM
     btCollisionShape* newShape = this->convertMFnMeshToStaticCollisionShape(mfnMesh);
 
     // Convert Maya's MMatrix to Bullet's btTransform
-    btTransform bulletTransform = this->getBulletTransformFromMFnMeshTransform(mfnMesh);
+    //btTransform bulletTransform = this->getBulletTransformFromMFnMeshTransform(mfnMesh);
+    btTransform bulletTransform = btTransform();
+    bulletTransform.setIdentity();
+    bulletTransform.setRotation(btQuaternion(btVector3(0.0, 0.0, 0.0), 0));
 
     // Create a rigid body with a mass of 0 for a static object
     btDefaultMotionState* motionState = new btDefaultMotionState(bulletTransform);
@@ -230,8 +242,10 @@ btRigidBody* BulletCollisionHandler::createFullColliderFromMFnMesh(MFnMesh* mfnM
     rigidBody->setCollisionFlags(rigidBody->getCollisionFlags() | btCollisionObject::CF_STATIC_OBJECT);
     
     //DEBUG FUNCTION CALL REMOVE LATER
-    this->createMayaMeshFromBulletRigidBody(rigidBody);
-
+    //MGlobal::displayInfo("CREATING COLLIDER FOR MESH (" + MString() + mfnMesh->fullPathName() + MString(")..."));
+    //this->createMayaMeshFromBulletRigidBody(rigidBody);
+    
+    //ADD MASS AND INERTIA FOR STATIC COLLIDERS
     return rigidBody;
 }
 
@@ -254,17 +268,17 @@ btRigidBody* BulletCollisionHandler::createFullActiveRigidBodyFromMFnMesh(MFnMes
     btRigidBody* rigidBody = new btRigidBody(rbInfo);
 
     rigidBody->setRestitution(0);
-    rigidBody->setFriction(10);
-    rigidBody->setRollingFriction(10);
-    rigidBody->setSpinningFriction(10);
-    rigidBody->setDamping(10, 10);
-    rigidBody->setContactStiffnessAndDamping(10, 10);
+    rigidBody->setFriction(1);
+    //rigidBody->setRollingFriction(1);
+    //rigidBody->setSpinningFriction(1);
+    rigidBody->setDamping(5, 5);
+    //rigidBody->setContactStiffnessAndDamping(1, 1);
 
     rigidBody->setCollisionFlags(rigidBody->getCollisionFlags() | btCollisionObject::CF_DYNAMIC_OBJECT);
     rigidBody->setActivationState(DISABLE_DEACTIVATION);
 
     // Add rigid body to the dynamics world and set up proxy object
-    this->dynamicsWorld->addRigidBody(rigidBody, 1, 1);
+    this->dynamicsWorld->addRigidBody(rigidBody, btBroadphaseProxy::DefaultFilter, btBroadphaseProxy::AllFilter);
     MString info_msg = "BulletCollisionHandler: Active object updated and added to the dynamicsWorld.";
     MGlobal::displayInfo(info_msg);
 
@@ -301,7 +315,7 @@ btTransform BulletCollisionHandler::getBulletTransformFromMFnMeshTransform(MFnMe
 btCollisionShape* BulletCollisionHandler::convertMFnMeshToStaticCollisionShape(MFnMesh* mfnMesh) {
     // Get the points in local space
     MPointArray mayaVertices;
-    mfnMesh->getPoints(mayaVertices, MSpace::kObject);
+    mfnMesh->getPoints(mayaVertices, MSpace::kWorld);
 
     // Create the Bullet triangle mesh
     btTriangleMesh* triMesh = new btTriangleMesh();
@@ -312,6 +326,7 @@ btCollisionShape* BulletCollisionHandler::convertMFnMeshToStaticCollisionShape(M
 
     // Index variables for triangleVertices
     int triangleIndex = 0;
+    MGlobal::displayInfo(MString("-----GENERATING COLLIDER FOR MESH: ") + MString() + mfnMesh->fullPathName());
 
     // Loop through the number of triangles
     for (unsigned int i = 0; i < triangleCounts.length(); ++i) {
@@ -338,7 +353,7 @@ btCollisionShape* BulletCollisionHandler::convertMFnMeshToStaticCollisionShape(M
             //triMesh->addTriangle(vertices[0], vertices[2], vertices[1]);
             triMesh->addTriangle(vertices[0], vertices[1], vertices[2]);
 
-            //MGlobal::displayInfo(MString("vertex pos of collider ") + vertices->getX() + ", " + vertices->getY() + ", " + vertices->getZ());
+            MGlobal::displayInfo(MString("vertex pos of collider ") + vertices->getX() + ", " + vertices->getY() + ", " + vertices->getZ());
 
             // Move to the next set of vertices
             triangleIndex += 3;
