@@ -330,20 +330,17 @@ btCollisionShape* BulletCollisionHandler::convertMFnMeshToActiveCollisionShape(M
 }
 
 btTransform BulletCollisionHandler::convertMayaToBulletMatrix(const MMatrix& mayaMatrix) {
-    // Convert Maya matrix to MTransformationMatrix to extract rotation
     MTransformationMatrix mayaTransMatrix(mayaMatrix);
     MQuaternion mayaQuat = mayaTransMatrix.rotation();
 
     // Convert Maya quaternion to Bullet quaternion, adjusting for coordinate system differences
     btQuaternion bulletQuat(mayaQuat.x, -mayaQuat.z, mayaQuat.y, mayaQuat.w);
 
-    // Extract the translation part from Maya matrix
     MVector mayaTranslation = mayaTransMatrix.getTranslation(MSpace::kTransform);
 
     // Adjust the translation for Bullet's coordinate system (Z-up)
     btVector3 bulletTranslation(mayaTranslation.x, mayaTranslation.z, -mayaTranslation.y);
 
-    // Create the Bullet transform
     btTransform bulletTransform;
     bulletTransform.setRotation(bulletQuat);
     bulletTransform.setOrigin(bulletTranslation);
@@ -352,16 +349,13 @@ btTransform BulletCollisionHandler::convertMayaToBulletMatrix(const MMatrix& may
 }
 
 MMatrix BulletCollisionHandler::convertBulletToMayaMatrix(const btTransform& bulletTransform) {
-    // Extract the rotation part as a quaternion
     btQuaternion bulletQuat = bulletTransform.getRotation();
 
     // Convert Bullet quaternion to Maya quaternion
     MQuaternion mayaQuat(bulletQuat.getX(), -bulletQuat.getZ(), bulletQuat.getY(), bulletQuat.getW());
 
-    // Convert the Maya quaternion to a Maya transformation matrix
     MMatrix mayaMatrix = mayaQuat.asMatrix();
 
-    // Extract the translation part and adjust for Maya's coordinate system
     btVector3 bulletTranslation = bulletTransform.getOrigin();
 
     // Adjust the translation for Maya's coordinate system (Y-up)
