@@ -134,7 +134,6 @@ std::vector<MFnMesh*> CollisionCandidatesFinder::checkNearbyObjects()
 {
     MObject selectedMObject = this->activeMFnMesh->object();
     std::vector<MFnMesh*> collisionCandidates;
-
     if (selectedMObject.isNull()) {
         return collisionCandidates;
     }
@@ -157,7 +156,7 @@ std::vector<MFnMesh*> CollisionCandidatesFinder::checkNearbyObjects()
     MPoint worldMaxPoint = boundingBox.max() * worldMatrix;
 
     // Expand the bounding box by a certain distance to find nearby objects
-    double distance = 0.1;
+    double distance = 2;
     worldMinPoint -= MVector(distance, distance, distance);
     worldMaxPoint += MVector(distance, distance, distance);
 

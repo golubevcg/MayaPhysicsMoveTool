@@ -1,6 +1,5 @@
 #include <CollisionCandidatesFinder.h>
 #include <BulletCollisionHandler.h>
-#include <BulletOpenGLWidget.h>
 
 #include <maya/MFnPlugin.h>
 #include <maya/MStreamUtils.h>
@@ -58,7 +57,7 @@ CustomMoveManip::CustomMoveManip()
         this->collisionCandidatesFinder.addActiveObject();
 
         this->collisionCandidatesFinder.getSceneMFnMeshes();
-        this->collisionCandidatesFinder.initializeRTree();
+        //this->collisionCandidatesFinder.initializeRTree();
 
         this->bulletCollisionHandler.createDynamicsWorld();
 
@@ -158,9 +157,8 @@ MStatus CustomMoveManip::doPress()
 MStatus CustomMoveManip::doDrag() {
     // Update the world.
     this->bulletCollisionHandler.updateWorld(5);
-
-    // Check for collision candidates and update colliders.
     /*
+    // Check for collision candidates and update colliders.
     std::vector<MFnMesh*> collisionCandidates = this->collisionCandidatesFinder.checkNearbyObjects();
     if (!collisionCandidates.empty()) {
         this->bulletCollisionHandler.updateColliders(collisionCandidates);
