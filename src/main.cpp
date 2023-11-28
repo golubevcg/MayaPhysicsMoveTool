@@ -1,3 +1,4 @@
+#include <maya/MFnPlugin.h>
 #include <CustomMoveManipContext.cpp>
 #include <MayaIncludes.h>
 
@@ -7,13 +8,10 @@
 // This is the command that will be used to create instances
 // of our context.
 //
-class CustomMoveManipContextCommand : public MPxContextCommand
-{
+class CustomMoveManipContextCommand : public MPxContextCommand {
 public:
     CustomMoveManipContextCommand() {};
     MPxContext* makeObj() override;
-
-
 public:
     static void* creator();
 };

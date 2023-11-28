@@ -1,5 +1,3 @@
-#include <maya/MFnPlugin.h>
-#include <maya/MStreamUtils.h>
 #include <CollisionCandidatesFinder.h>
 #include <BulletCollisionHandler.h>
 
