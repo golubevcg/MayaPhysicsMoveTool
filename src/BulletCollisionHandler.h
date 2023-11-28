@@ -5,14 +5,19 @@
 #define BULLET_COLLISION_HANDLER_H
 
 #include <vector>
-
 #include "btBulletDynamicsCommon.h"
 
 class BulletCollisionHandler 
 {
     public:
-        BulletCollisionHandler();
-        ~BulletCollisionHandler();
+        static BulletCollisionHandler& getInstance() {
+            static BulletCollisionHandler instance;
+            return instance;
+        }
+
+        // Delete copy constructor and copy assignment operator to prevent copies of the singleton
+        BulletCollisionHandler(const BulletCollisionHandler&) = delete;
+        BulletCollisionHandler& operator=(const BulletCollisionHandler&) = delete;
 
         void createDynamicsWorld();
         void deleteDynamicsWorld();
@@ -22,7 +27,6 @@ class BulletCollisionHandler
         void updateColliders(std::vector<MFnMesh*> collidersMFnMeshes);
         btRigidBody* createFullColliderFromMFnMesh(MFnMesh* mfnMesh);
         btRigidBody* createFullActiveRigidBodyFromMFnMesh(MFnMesh* mfnMesh);
-
 
         MMatrix getActiveObjectTransformMMatrix();
 
@@ -36,14 +40,15 @@ class BulletCollisionHandler
 
         void updateWorld(float framesToUpdate);
 
-        MObject createMayaMeshFromBulletRigidBody(btRigidBody* rigidBody);
-
         btRigidBody* activeRigidBody;
         btRigidBody* proxyRigidBody;
         std::vector<btRigidBody*> colliders;
 
         btDiscreteDynamicsWorld* dynamicsWorld;
     private:
+        BulletCollisionHandler();
+        ~BulletCollisionHandler();
+
         btBroadphaseInterface* broadphase;
         btDefaultCollisionConfiguration* collisionConfiguration;
         btCollisionDispatcher* dispatcher;

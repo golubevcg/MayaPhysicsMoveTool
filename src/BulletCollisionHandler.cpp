@@ -9,15 +9,14 @@
 #include <LinearMath/btAlignedObjectArray.h>
 #include <btBulletDynamicsCommon.h>
 
-BulletCollisionHandler::BulletCollisionHandler()
-    : broadphase(nullptr),
+BulletCollisionHandler::BulletCollisionHandler(): 
+    broadphase(nullptr),
     collisionConfiguration(nullptr),
     dispatcher(nullptr),
     solver(nullptr),
     dynamicsWorld(nullptr),
     activeRigidBody(nullptr),
-    proxyRigidBody(nullptr)
-{
+    proxyRigidBody(nullptr){
 }
 
 BulletCollisionHandler::~BulletCollisionHandler() {
@@ -175,7 +174,7 @@ btRigidBody* BulletCollisionHandler::createFullColliderFromMFnMesh(MFnMesh* mfnM
     rigidBody->setCollisionFlags(rigidBody->getCollisionFlags() | btCollisionObject::CF_STATIC_OBJECT);
     rigidBody->setActivationState(DISABLE_DEACTIVATION);
 
-    rigidBody->setRestitution(0.05);
+    rigidBody->setRestitution(0);
     rigidBody->setFriction(0.1);
     rigidBody->setRollingFriction(0.1);
     rigidBody->setSpinningFriction(0.1);
@@ -195,7 +194,7 @@ btRigidBody* BulletCollisionHandler::createFullActiveRigidBodyFromMFnMesh(MFnMes
     btTransform bulletTransform = this->getBulletTransformFromMFnMeshTransform(mfnMesh);
 
     // Define the mass of the rigid body
-    float mass = 1;
+    float mass = 1.5;
     btVector3 localInertia(0, 0, 0);
     collisionShape->calculateLocalInertia(mass, localInertia);
 
@@ -204,7 +203,7 @@ btRigidBody* BulletCollisionHandler::createFullActiveRigidBodyFromMFnMesh(MFnMes
     btRigidBody::btRigidBodyConstructionInfo rbInfo(mass, motionState, collisionShape, localInertia);
     btRigidBody* rigidBody = new btRigidBody(rbInfo);
 
-    rigidBody->setRestitution(0.05);
+    rigidBody->setRestitution(0);
     rigidBody->setFriction(0.15);
     rigidBody->setRollingFriction(0.15);
     rigidBody->setSpinningFriction(0.15);
