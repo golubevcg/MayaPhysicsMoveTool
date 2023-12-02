@@ -1,6 +1,6 @@
 #include <maya/MFnPlugin.h>
-#include <CustomMoveManipContext.cpp>
 #include <MayaIncludes.h>
+#include <CustomMoveManipContext.h>
 
 //
 // moveManipContextCommand
@@ -28,8 +28,7 @@ void* CustomMoveManipContextCommand::creator() {
 //
 // register/unregister the context and manipulator
 //
-MStatus initializePlugin(MObject obj)
-{
+MStatus initializePlugin(MObject obj) {
     MStatus status;
     MFnPlugin plugin(obj, PLUGIN_COMPANY, "1.0", "Andrew Golubev");
     status = plugin.registerContextCommand("customMoveManipContext",
@@ -49,8 +48,7 @@ MStatus initializePlugin(MObject obj)
     return status;
 }
 
-MStatus uninitializePlugin(MObject obj)
-{
+MStatus uninitializePlugin(MObject obj) {
     MStatus status;
     MFnPlugin plugin(obj);
     status = plugin.deregisterContextCommand("customMoveManipContext");

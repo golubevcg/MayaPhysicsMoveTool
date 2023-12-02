@@ -1,26 +1,5 @@
-#include <maya/MFnPlugin.h>
-#include <maya/MStreamUtils.h>
-#include <CollisionCandidatesFinder.h>
-#include <BulletCollisionHandler.h>
-#include <CustomMoveManip.cpp>
+#include <CustomMoveManipContext.h>
 
-
-//
-// MoveManipContext
-//
-// This class is a simple context for supporting a move manipulator.
-//
-class CustomMoveManipContext: public MPxSelectionContext{
-    public:
-        CustomMoveManipContext();
-        void    toolOnSetup(MEvent& event) override;
-        void    toolOffCleanup() override;
-        static void selectionChanged(void* data);
-    private:
-        MCallbackId id1;
-        CollisionCandidatesFinder& collisionCandidatesFinder;
-        BulletCollisionHandler& bulletCollisionHandler;
-};
 
 CustomMoveManipContext::CustomMoveManipContext()
      :id1(0), 
@@ -30,8 +9,7 @@ CustomMoveManipContext::CustomMoveManipContext()
     setTitleString(str);
 }
 
-void CustomMoveManipContext::toolOnSetup(MEvent&)
-{
+void CustomMoveManipContext::toolOnSetup(MEvent&) {
     MString str("Move the object using the manipulator");
     setHelpString(str);
     selectionChanged(this);
@@ -44,8 +22,7 @@ void CustomMoveManipContext::toolOnSetup(MEvent&)
     }
 }
 
-void CustomMoveManipContext::toolOffCleanup()
-{
+void CustomMoveManipContext::toolOffCleanup() {
     MStatus status;
     status = MModelMessage::removeCallback(id1);
     if (!status) {
@@ -55,8 +32,7 @@ void CustomMoveManipContext::toolOffCleanup()
     MPxContext::toolOffCleanup();
 }
 
-void CustomMoveManipContext::selectionChanged(void* data)
-{
+void CustomMoveManipContext::selectionChanged(void* data) {
     MStatus stat = MStatus::kSuccess;
 
     CustomMoveManipContext* ctxPtr = (CustomMoveManipContext*)data;

@@ -3,7 +3,6 @@
 
 CollisionCandidatesFinder::CollisionCandidatesFinder()
     : activeMFnMesh(nullptr) {
-
 }
 
 CollisionCandidatesFinder::~CollisionCandidatesFinder() {

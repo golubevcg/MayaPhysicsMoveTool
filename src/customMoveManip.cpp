@@ -1,33 +1,12 @@
-#include <CollisionCandidatesFinder.h>
-#include <BulletCollisionHandler.h>
-
-class CustomMoveManip : public MPxManipContainer {
-public:
-    CustomMoveManip() : bulletCollisionHandler(BulletCollisionHandler::getInstance()),
-                        collisionCandidatesFinder(CollisionCandidatesFinder::getInstance()) {
-    }
-
-    static void* creator();
-    static MStatus initialize();
-    MStatus createChildren() override;
-    MStatus connectToDependNode(const MObject&) override;
-    MStatus doDrag() override;
-    MStatus doPress() override;
-    void setupCollisions();
-    void applyTransformToActiveObjectTransform(const MMatrix matrix);
-
-private:
-    void updateManipLocations(const MObject& node);
-    CollisionCandidatesFinder& collisionCandidatesFinder;
-    BulletCollisionHandler& bulletCollisionHandler;
-
-public:
-    static MTypeId id;
-    MDagPath fFreePointManipDagPath;
-};
+#include <CustomMoveManip.h>
 
 MTypeId CustomMoveManip::id(0x8001d);
 
+CustomMoveManip::CustomMoveManip()       
+    :bulletCollisionHandler(BulletCollisionHandler::getInstance()),
+    collisionCandidatesFinder(CollisionCandidatesFinder::getInstance()) {
+    // Constructor implementation
+}
 
 void CustomMoveManip::setupCollisions() {
     this->collisionCandidatesFinder.addActiveObject();
@@ -43,8 +22,7 @@ void* CustomMoveManip::creator() {
     return new CustomMoveManip();
 }
 
-MStatus CustomMoveManip::initialize()
-{
+MStatus CustomMoveManip::initialize() {
     MStatus stat;
     stat = MPxManipContainer::initialize();
 
@@ -53,8 +31,7 @@ MStatus CustomMoveManip::initialize()
     return stat;
 }
 
-MStatus CustomMoveManip::createChildren()
-{
+MStatus CustomMoveManip::createChildren() {
     MStatus stat = MStatus::kSuccess;
     MPoint startPoint(0.0, 0.0, 0.0);
     MVector direction(0.0, 1.0, 0.0);
@@ -64,8 +41,7 @@ MStatus CustomMoveManip::createChildren()
     return stat;
 }
 
-MStatus CustomMoveManip::connectToDependNode(const MObject& node)
-{
+MStatus CustomMoveManip::connectToDependNode(const MObject& node) {
     MStatus stat;
     //
     // This routine connects the translate plug to the position plug on the freePoint
@@ -82,12 +58,12 @@ MStatus CustomMoveManip::connectToDependNode(const MObject& node)
 }
 // Viewport 2.0 manipulator draw overrides
 
-void CustomMoveManip::updateManipLocations(const MObject& node)
+void CustomMoveManip::updateManipLocations(const MObject& node) {
 //
 // Description
 //        setTranslation and setRotation to the parent's transformation.
 //
-{
+
     MFnFreePointTriadManip manipFn(this->fFreePointManipDagPath);
 
     MDagPath dagPath;
@@ -107,8 +83,7 @@ void CustomMoveManip::updateManipLocations(const MObject& node)
     MStatus status;
 }
 
-MStatus CustomMoveManip::doPress()
-{
+MStatus CustomMoveManip::doPress() {
     MStatus status = MPxManipContainer::doPress();
 
     return status;

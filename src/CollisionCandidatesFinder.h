@@ -3,10 +3,9 @@
 #ifndef COLLISION_CANDIDATES_FINDER_H
 #define COLLISION_CANDIDATES_FINDER_H
 
+#include <stdlib.h>
 #include <stdio.h>
 #include <vector>
-#include <stdlib.h>
-
 #include <MayaIncludes.h>
 
 class CollisionCandidatesFinder{
