@@ -5,10 +5,11 @@ MTypeId CustomMoveManip::id(0x8001d);
 CustomMoveManip::CustomMoveManip()       
     :bulletCollisionHandler(BulletCollisionHandler::getInstance()),
     collisionCandidatesFinder(CollisionCandidatesFinder::getInstance()) {
-    // Constructor implementation
+    MGlobal::displayWarning("---CUSTOMMOVEMANIP CONSTRUCTOR");
 }
 
 void CustomMoveManip::setupCollisions() {
+    MGlobal::displayWarning("---CUSTOMMOVEMANIP setupCollisions");
     this->collisionCandidatesFinder.addActiveObject();
     this->collisionCandidatesFinder.getSceneMFnMeshes();
 
@@ -19,15 +20,14 @@ void CustomMoveManip::setupCollisions() {
 }
 
 void* CustomMoveManip::creator() {
+    MGlobal::displayWarning("---CUSTOMMOVEMANIP CREATOR");
     return new CustomMoveManip();
 }
 
 MStatus CustomMoveManip::initialize() {
     MStatus stat;
     stat = MPxManipContainer::initialize();
-
-    MString message_text = "CustomMoveManip initialized";
-    MGlobal::displayInfo(message_text);
+    MGlobal::displayInfo("CustomMoveManip initialized");
     return stat;
 }
 
@@ -47,23 +47,26 @@ MStatus CustomMoveManip::connectToDependNode(const MObject& node) {
     // This routine connects the translate plug to the position plug on the freePoint
     // manipulator.
     //
+    MGlobal::displayWarning("---CUSTOMMOVEMANIP connectToDependNode");
     MFnDependencyNode nodeFn(node);
     MPlug tPlug = nodeFn.findPlug("translate", true, &stat);
     MFnFreePointTriadManip freePointManipFn(this->fFreePointManipDagPath);
     //freePointManipFn.connectToPointPlug(tPlug);
+
+    //create rotate manip
+    // create scale manip (BUT CHECK IF YOU CAN MODIFY THEIR VISIBILITY
     this->updateManipLocations(node);
     this->finishAddingManips();
     MPxManipContainer::connectToDependNode(node);
     return stat;
 }
-// Viewport 2.0 manipulator draw overrides
 
 void CustomMoveManip::updateManipLocations(const MObject& node) {
 //
 // Description
 //        setTranslation and setRotation to the parent's transformation.
 //
-
+    MGlobal::displayWarning("---CUSTOMMOVEMANIP updateManipLocations");
     MFnFreePointTriadManip manipFn(this->fFreePointManipDagPath);
 
     MDagPath dagPath;
@@ -84,12 +87,15 @@ void CustomMoveManip::updateManipLocations(const MObject& node) {
 }
 
 MStatus CustomMoveManip::doPress() {
+    MGlobal::displayWarning("---CUSTOMMOVEMANIP doPress");
     MStatus status = MPxManipContainer::doPress();
 
     return status;
 }
 
 MStatus CustomMoveManip::doDrag() {
+    MGlobal::displayWarning("---CUSTOMMOVEMANIP doDrag");
+
     // Update the world.
     this->bulletCollisionHandler.updateWorld(5);
 

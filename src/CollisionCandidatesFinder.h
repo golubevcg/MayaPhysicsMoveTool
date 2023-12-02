@@ -15,6 +15,9 @@ class CollisionCandidatesFinder{
             return instance;
         }
 
+        CollisionCandidatesFinder(const CollisionCandidatesFinder&) = delete;
+        CollisionCandidatesFinder& operator=(const CollisionCandidatesFinder&) = delete;
+
         MStatus addActiveObject();
         MStatus getSceneMFnMeshes();
 

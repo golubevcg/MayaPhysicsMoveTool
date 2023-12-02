@@ -1,14 +1,17 @@
 #include "CollisionCandidatesFinder.h"
 
 
-CollisionCandidatesFinder::CollisionCandidatesFinder()
-    : activeMFnMesh(nullptr) {
+CollisionCandidatesFinder::CollisionCandidatesFinder(): 
+    activeMFnMesh(nullptr) {
+    MGlobal::displayWarning("---CollisionCandidatesFinder CONSTRUCTOR");
 }
 
 CollisionCandidatesFinder::~CollisionCandidatesFinder() {
+    /*
     for (MFnMesh* mesh : this->allSceneMFnMeshes) {
         delete mesh;
     }
+    */
 }
 
 MStatus CollisionCandidatesFinder::addActiveObject() {

@@ -7,12 +7,14 @@ CustomMoveManipContext::CustomMoveManipContext()
       collisionCandidatesFinder(CollisionCandidatesFinder::getInstance()) {
     MString str("Plugin move Manipulator");
     setTitleString(str);
+    MGlobal::displayWarning("---CustomMoveManipContext CREATOR");
 }
 
 void CustomMoveManipContext::toolOnSetup(MEvent&) {
     MString str("Move the object using the manipulator");
     setHelpString(str);
-    selectionChanged(this);
+    //selectionChanged(this);
+    MGlobal::displayWarning("---CustomMoveManipContext toolOnSetup");
     MStatus status;
     id1 = MModelMessage::addCallback(MModelMessage::kActiveListModified,
         selectionChanged,
@@ -34,8 +36,10 @@ void CustomMoveManipContext::toolOffCleanup() {
 
 void CustomMoveManipContext::selectionChanged(void* data) {
     MStatus stat = MStatus::kSuccess;
+    MGlobal::displayWarning("---CustomMoveManipContext selectionChanged");
 
     CustomMoveManipContext* ctxPtr = (CustomMoveManipContext*)data;
+
     ctxPtr->deleteManipulators();
     MSelectionList list;
     stat = MGlobal::getActiveSelectionList(list);
@@ -81,4 +85,3 @@ void CustomMoveManipContext::selectionChanged(void* data) {
         }
     }
 }
-

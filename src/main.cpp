@@ -4,7 +4,6 @@
 
 //
 // moveManipContextCommand
-//
 // This is the command that will be used to create instances
 // of our context.
 //

@@ -3,7 +3,6 @@
 #include <string>
 #include <MayaIncludes.h>
 #include "BulletCollisionHandler.h"
-
 #include <BulletCollision/Gimpact/btGImpactShape.h>
 #include <BulletCollision/Gimpact/btGImpactCollisionAlgorithm.h>
 #include <LinearMath/btAlignedObjectArray.h>
@@ -17,6 +16,7 @@ BulletCollisionHandler::BulletCollisionHandler():
     dynamicsWorld(nullptr),
     activeRigidBody(nullptr),
     proxyRigidBody(nullptr){
+    MGlobal::displayWarning("---BulletCollisionHandler CONSTRUCTOR");
 }
 
 BulletCollisionHandler::~BulletCollisionHandler() {
@@ -24,19 +24,11 @@ BulletCollisionHandler::~BulletCollisionHandler() {
 }
 
 void BulletCollisionHandler::createDynamicsWorld() {
-    // Create a broadphase interface
     this->broadphase = new btDbvtBroadphase();
-
-    // Create a collision configuration
     this->collisionConfiguration = new btDefaultCollisionConfiguration();
-
-    // Create a collision dispatcher
     this->dispatcher = new btCollisionDispatcher(collisionConfiguration);
-
-    // Create a constraint solver
     this->solver = new btSequentialImpulseConstraintSolver;
 
-    // Create the dynamics world
     this->dynamicsWorld = new btDiscreteDynamicsWorld(dispatcher, broadphase, solver, collisionConfiguration);
     this->dynamicsWorld->setGravity(btVector3(0, 0, 0));
 }
@@ -53,8 +45,6 @@ void BulletCollisionHandler::deleteDynamicsWorld() {
             this->dynamicsWorld->removeCollisionObject(obj);
             delete obj;
         }
-
-        // Delete the dynamics world
         delete this->dynamicsWorld;
     }
 
