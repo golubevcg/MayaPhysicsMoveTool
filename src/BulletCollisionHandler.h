@@ -19,7 +19,7 @@ class BulletCollisionHandler
 
         void cleanRigidBody(btRigidBody* body);
         void updateActiveObject(MFnMesh* mesh);
-        void updateColliders(std::vector<MFnMesh*> collidersMFnMeshes);
+        void updateColliders(std::vector<MFnMesh*> collidersMFnMeshes, MFnMesh* exclude = nullptr);
         btRigidBody* createFullColliderFromMFnMesh(MFnMesh* mfnMesh);
         btRigidBody* createFullActiveRigidBodyFromMFnMesh(MFnMesh* mfnMesh);
 
@@ -36,13 +36,11 @@ class BulletCollisionHandler
 
         void updateWorld(float framesToUpdate);
 
-        MObject createMayaMeshFromBulletRigidBody(btRigidBody* rigidBody);
-
         btRigidBody* activeRigidBody;
         btRigidBody* proxyRigidBody;
         std::vector<btRigidBody*> colliders;
-
         btDiscreteDynamicsWorld* dynamicsWorld;
+
     private:
         btBroadphaseInterface* broadphase;
         btDefaultCollisionConfiguration* collisionConfiguration;

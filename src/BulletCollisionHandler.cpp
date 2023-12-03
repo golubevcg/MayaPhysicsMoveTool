@@ -1,23 +1,19 @@
-// MayaToBulletUtils.cpp
-
 #include <string>
 #include <MayaIncludes.h>
 #include "BulletCollisionHandler.h"
-
 #include <BulletCollision/Gimpact/btGImpactShape.h>
 #include <BulletCollision/Gimpact/btGImpactCollisionAlgorithm.h>
 #include <LinearMath/btAlignedObjectArray.h>
 #include <btBulletDynamicsCommon.h>
 
-BulletCollisionHandler::BulletCollisionHandler()
-    : broadphase(nullptr),
+BulletCollisionHandler::BulletCollisionHandler(): 
+    broadphase(nullptr),
     collisionConfiguration(nullptr),
     dispatcher(nullptr),
     solver(nullptr),
     dynamicsWorld(nullptr),
     activeRigidBody(nullptr),
-    proxyRigidBody(nullptr)
-{
+    proxyRigidBody(nullptr) {
 }
 
 BulletCollisionHandler::~BulletCollisionHandler() {
@@ -25,19 +21,12 @@ BulletCollisionHandler::~BulletCollisionHandler() {
 }
 
 void BulletCollisionHandler::createDynamicsWorld() {
-    // Create a broadphase interface
+    // Create the dynamics world
     this->broadphase = new btDbvtBroadphase();
-
-    // Create a collision configuration
     this->collisionConfiguration = new btDefaultCollisionConfiguration();
-
-    // Create a collision dispatcher
     this->dispatcher = new btCollisionDispatcher(collisionConfiguration);
-
-    // Create a constraint solver
     this->solver = new btSequentialImpulseConstraintSolver;
 
-    // Create the dynamics world
     this->dynamicsWorld = new btDiscreteDynamicsWorld(dispatcher, broadphase, solver, collisionConfiguration);
     this->dynamicsWorld->setGravity(btVector3(0, 0, 0));
 }
@@ -130,24 +119,29 @@ void BulletCollisionHandler::cleanRigidBody(btRigidBody* body) {
     }
 }
 
-void BulletCollisionHandler::updateColliders(std::vector<MFnMesh*> collidersMFnMeshes)
+void BulletCollisionHandler::updateColliders(std::vector<MFnMesh*> collidersMFnMeshes, MFnMesh* excludeMesh)
 {
-    // Remove all existing colliders from the world and delete them
-    for (auto& collider : this->colliders) {
-        if (collider) {
-            this->dynamicsWorld->removeCollisionObject(collider);
-            delete collider->getCollisionShape();
-            btRigidBody* body = btRigidBody::upcast(collider);
-            if (body && body->getMotionState()) {
-                delete body->getMotionState();
+    if (!this->colliders.empty()) {
+        // Remove all existing colliders from the world and delete them
+        for (auto& collider : this->colliders) {
+            if (collider) {
+                this->dynamicsWorld->removeCollisionObject(collider);
+                delete collider->getCollisionShape();
+                btRigidBody* body = btRigidBody::upcast(collider);
+                if (body && body->getMotionState()) {
+                    delete body->getMotionState();
+                }
+                delete collider;
             }
-            delete collider;
         }
+        this->colliders.clear();
     }
-    this->colliders.clear();
 
     // Add new colliders based on the provided MFnMeshes
     for (auto& mfnMesh : collidersMFnMeshes) {
+        if(excludeMesh!=nullptr && excludeMesh->fullPathName() == mfnMesh->fullPathName()){
+            continue;
+        }
 
         btRigidBody* rigidBody = this->createFullColliderFromMFnMesh(mfnMesh);
 

@@ -14,16 +14,14 @@
 //
 
 class CustomMoveManipContext : public MPxSelectionContext {
-public:
-    CustomMoveManipContext();
-    void toolOnSetup(MEvent& event) override;
-    void toolOffCleanup() override;
-    static void selectionChanged(void* data);
+    public:
+        CustomMoveManipContext();
+        void toolOnSetup(MEvent& event) override;
+        void toolOffCleanup() override;
+        static void selectionChanged(void* data);
 
-private:
-    MCallbackId id1;
-    CollisionCandidatesFinder& collisionCandidatesFinder;
-    BulletCollisionHandler& bulletCollisionHandler;
+    private:
+        MCallbackId id;
 };
 
 #endif // CUSTOM_MOVE_MANIP_CONTEXT_H

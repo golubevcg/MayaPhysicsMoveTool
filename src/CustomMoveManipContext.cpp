@@ -1,22 +1,11 @@
+#include <CustomMoveManipContext.h>
 #include <CustomMoveManip.h>
 #include <MayaIncludes.h>
 
 //
 // MoveManipContext
+// This class is a simple context to support our custom a move manipulator.
 //
-// This class is a simple context for supporting a move manipulator.
-//
-class CustomMoveManipContext : public MPxSelectionContext {
-public:
-    CustomMoveManipContext();
-    void    toolOnSetup(MEvent& event) override;
-    void    toolOffCleanup() override;
-    // Callback issued when selection list changes
-    static void selectionChanged(void* data);
-private:
-    MCallbackId id1;
-};
-
 CustomMoveManipContext::CustomMoveManipContext() {
     MString str("Plugin move Manipulator");
     setTitleString(str);
@@ -27,9 +16,7 @@ void CustomMoveManipContext::toolOnSetup(MEvent&) {
     setHelpString(str);
     selectionChanged(this);
     MStatus status;
-    id1 = MModelMessage::addCallback(MModelMessage::kActiveListModified,
-        selectionChanged,
-        this, &status);
+    this->id = MModelMessage::addCallback(MModelMessage::kActiveListModified, selectionChanged, this, &status);
     if (!status) {
         MGlobal::displayError("Model addCallback failed");
     }
@@ -37,7 +24,7 @@ void CustomMoveManipContext::toolOnSetup(MEvent&) {
 
 void CustomMoveManipContext::toolOffCleanup() {
     MStatus status;
-    status = MModelMessage::removeCallback(id1);
+    status = MModelMessage::removeCallback(this->id);
     if (!status) {
         MGlobal::displayError("Model remove callback failed");
     }
@@ -57,12 +44,7 @@ void CustomMoveManipContext::selectionChanged(void* data) {
         return;
     }
 
-    MString testText = "Selection changed";
-    MGlobal::displayInfo(testText);
-
     for (; !iter.isDone(); iter.next()) {
-        // Make sure the selection list item is a depend node and has the
-        // required plugs before manipulating it.
         MObject dependNode;
         iter.getDependNode(dependNode);
         if (dependNode.isNull() || !dependNode.hasFn(MFn::kDependencyNode))
@@ -90,8 +72,6 @@ void CustomMoveManipContext::selectionChanged(void* data) {
                 MGlobal::displayWarning("Error connecting manipulator to"
                     " object: " + dependNodeFn.name());
             }
-
-
         }
     }
 }

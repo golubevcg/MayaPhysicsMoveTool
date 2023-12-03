@@ -10,17 +10,12 @@ public:
     CustomMoveManip();
     ~CustomMoveManip() override;
 
-
     static void* creator();
     static MStatus initialize();
     MStatus createChildren() override;
     MStatus connectToDependNode(const MObject&) override;
-    // Viewport 2.0 rendering
-    void drawUI(MHWRender::MUIDrawManager&, const MHWRender::MFrameContext&) const override;
     MStatus doDrag() override;
     MStatus doPress() override;
-    bool created = false;
-
     void applyTransformToActiveObjectTransform(MMatrix matrix);
 
 private:
@@ -28,7 +23,6 @@ private:
 public:
     MDagPath fFreePointManipDagPath;
     static MTypeId id;
-
     CollisionCandidatesFinder collisionCandidatesFinder;
     BulletCollisionHandler bulletCollisionHandler;
 };
