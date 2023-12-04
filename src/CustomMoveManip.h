@@ -23,7 +23,7 @@ private:
 public:
     MDagPath fFreePointManipDagPath;
     static MTypeId id;
-    CollisionCandidatesFinder collisionCandidatesFinder;
+    CollisionCandidatesFinder& collisionCandidatesFinder;
     BulletCollisionHandler& bulletCollisionHandler;
 };
 

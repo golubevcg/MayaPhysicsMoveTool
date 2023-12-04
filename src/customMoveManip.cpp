@@ -4,20 +4,17 @@
 MTypeId CustomMoveManip::id(0x8001d);
 
 CustomMoveManip::CustomMoveManip():
-    bulletCollisionHandler(BulletCollisionHandler::getInstance()){
-    MGlobal::displayWarning("getInstance()");
+        bulletCollisionHandler(BulletCollisionHandler::getInstance()),
+        collisionCandidatesFinder(CollisionCandidatesFinder::getInstance()) {
     this->collisionCandidatesFinder.addActiveObject();
     this->collisionCandidatesFinder.getSceneMFnMeshes();
     this->bulletCollisionHandler.createDynamicsWorld();
-    MGlobal::displayWarning("0getInstance()");
 
     this->bulletCollisionHandler.updateActiveObject(this->collisionCandidatesFinder.activeMFnMesh);
-    MGlobal::displayWarning("1getInstance()");
     this->bulletCollisionHandler.updateColliders(
         this->collisionCandidatesFinder.allSceneMFnMeshes, 
         this->collisionCandidatesFinder.activeMFnMesh
     );
-    MGlobal::displayWarning("2getInstance()");
 
     /*
     this->bulletCollisionHandler.createDynamicsWorld();
@@ -111,14 +108,17 @@ MStatus CustomMoveManip::doPress() {
 }
 
 MStatus CustomMoveManip::doDrag() {
+    MGlobal::displayWarning("doDrag_0");
     // Update the world.
     this->bulletCollisionHandler.updateWorld(5);
+    MGlobal::displayWarning("doDrag_1");
 
     // Read translation from manip.
     MFnManip3D manipFn(this->fFreePointManipDagPath);
     MPoint currentPosition;
     this->getConverterManipValue(0, currentPosition);
     MPoint currentTranslation = manipFn.translation(MSpace::kWorld);
+    MGlobal::displayWarning("doDrag_2");
 
     // Get the current position of the rigid body
     btVector3 currentPos = this->bulletCollisionHandler.activeRigidBody->getWorldTransform().getOrigin();
@@ -131,6 +131,7 @@ MStatus CustomMoveManip::doDrag() {
     float timeStep = 1.0f / 60.0f;
     // Calculate the required velocity to reach the target position in one time step
     btVector3 requiredVelocity = (targetPos - currentPos) / timeStep;
+    MGlobal::displayWarning("doDrag_3");
 
     // Apply this velocity to the rigid body
     this->bulletCollisionHandler.activeRigidBody->setLinearVelocity(requiredVelocity*0.01);
@@ -139,6 +140,7 @@ MStatus CustomMoveManip::doDrag() {
     // Read transform from active object.
     MMatrix activeObjectUpdatedMatrix = this->bulletCollisionHandler.getActiveObjectTransformMMatrix();
     this->applyTransformToActiveObjectTransform(activeObjectUpdatedMatrix);
+    MGlobal::displayWarning("doDrag_4");
 
     return MS::kUnknownParameter;
 }

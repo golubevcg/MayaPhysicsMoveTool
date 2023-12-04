@@ -11,8 +11,10 @@
 
 class CollisionCandidatesFinder {
     public:
-        CollisionCandidatesFinder();
-        ~CollisionCandidatesFinder();
+        static CollisionCandidatesFinder& getInstance() {
+            static CollisionCandidatesFinder instance;
+            return instance;
+        }
 
         MStatus addActiveObject();
         MStatus getSceneMFnMeshes();
@@ -22,6 +24,10 @@ class CollisionCandidatesFinder {
         MFnMesh* activeMFnMesh;
         MFnDagNode activeTransformMFnDagNode;
         std::vector<MFnMesh*> allSceneMFnMeshes;
+
+    private:
+        CollisionCandidatesFinder();
+        ~CollisionCandidatesFinder();
 };
 
 

@@ -7,17 +7,6 @@
 #include <LinearMath/btAlignedObjectArray.h>
 #include <btBulletDynamicsCommon.h>
 
-BulletCollisionHandler* BulletCollisionHandler::instance = nullptr;
-std::once_flag BulletCollisionHandler::initInstanceFlag;
-
-BulletCollisionHandler& BulletCollisionHandler::getInstance() {
-    std::call_once(initInstanceFlag, &BulletCollisionHandler::initSingleton);
-    return *instance;
-}
-
-void BulletCollisionHandler::initSingleton() {
-    instance = new BulletCollisionHandler();
-}
 
 BulletCollisionHandler::BulletCollisionHandler(): 
     broadphase(nullptr),
