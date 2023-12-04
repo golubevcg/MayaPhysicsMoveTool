@@ -3,20 +3,21 @@
 
 MTypeId CustomMoveManip::id(0x8001d);
 
-CustomMoveManip::CustomMoveManip() {
-
-
-    // The constructor must not call createChildren for user-defined manipulators.
+CustomMoveManip::CustomMoveManip():
+    bulletCollisionHandler(BulletCollisionHandler::getInstance()){
+    MGlobal::displayWarning("getInstance()");
     this->collisionCandidatesFinder.addActiveObject();
     this->collisionCandidatesFinder.getSceneMFnMeshes();
     this->bulletCollisionHandler.createDynamicsWorld();
+    MGlobal::displayWarning("0getInstance()");
 
-    MGlobal::displayInfo("Amount of scene MFnMeshes:" + MString() + this->collisionCandidatesFinder.allSceneMFnMeshes.size());
     this->bulletCollisionHandler.updateActiveObject(this->collisionCandidatesFinder.activeMFnMesh);
+    MGlobal::displayWarning("1getInstance()");
     this->bulletCollisionHandler.updateColliders(
         this->collisionCandidatesFinder.allSceneMFnMeshes, 
         this->collisionCandidatesFinder.activeMFnMesh
     );
+    MGlobal::displayWarning("2getInstance()");
 
     /*
     this->bulletCollisionHandler.createDynamicsWorld();
@@ -36,7 +37,7 @@ CustomMoveManip::CustomMoveManip() {
 }
 
 CustomMoveManip::~CustomMoveManip() {
-
+    MGlobal::displayInfo("out of destructor!!!!");
 }
 
 void* CustomMoveManip::creator() {

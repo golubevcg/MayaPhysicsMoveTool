@@ -1,10 +1,23 @@
 #include <string>
+#include <mutex>
 #include <MayaIncludes.h>
 #include "BulletCollisionHandler.h"
 #include <BulletCollision/Gimpact/btGImpactShape.h>
 #include <BulletCollision/Gimpact/btGImpactCollisionAlgorithm.h>
 #include <LinearMath/btAlignedObjectArray.h>
 #include <btBulletDynamicsCommon.h>
+
+BulletCollisionHandler* BulletCollisionHandler::instance = nullptr;
+std::once_flag BulletCollisionHandler::initInstanceFlag;
+
+BulletCollisionHandler& BulletCollisionHandler::getInstance() {
+    std::call_once(initInstanceFlag, &BulletCollisionHandler::initSingleton);
+    return *instance;
+}
+
+void BulletCollisionHandler::initSingleton() {
+    instance = new BulletCollisionHandler();
+}
 
 BulletCollisionHandler::BulletCollisionHandler(): 
     broadphase(nullptr),
@@ -14,6 +27,7 @@ BulletCollisionHandler::BulletCollisionHandler():
     dynamicsWorld(nullptr),
     activeRigidBody(nullptr),
     proxyRigidBody(nullptr) {
+    MGlobal::displayInfo("CONSTRUUUCTOOOOOOOOOR");
 }
 
 BulletCollisionHandler::~BulletCollisionHandler() {
@@ -107,16 +121,48 @@ MMatrix BulletCollisionHandler::getActiveObjectTransformMMatrix() {
     return MMatrix::identity;
 }
 
-void BulletCollisionHandler::cleanRigidBody(btRigidBody* body) {
-    if (body) {
-        // Remove it from the world
-        this->dynamicsWorld->removeRigidBody(body);
-
-        // Delete the motion state and the rigid body to avoid memory leaks
-        delete body->getMotionState();
-        delete body;
-        body = nullptr; // Ensure the pointer is reset to nullptr after deletion
+bool BulletCollisionHandler::isRigidBodyInWorld(btRigidBody* body) {
+    if (!body || !this->dynamicsWorld) {
+        return false;
     }
+
+    int numObjects = this->dynamicsWorld->getNumCollisionObjects();
+    for (int i = 0; i < numObjects; ++i) {
+        btCollisionObject* obj = this->dynamicsWorld->getCollisionObjectArray()[i];
+        if (obj == body) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+
+void BulletCollisionHandler::cleanRigidBody(btRigidBody* body) {
+    if (!body) {
+        return;
+    }
+
+    if (this->dynamicsWorld == nullptr) {
+        return;
+    }
+
+    if (!this->isRigidBodyInWorld(body)) {
+        return;
+    }
+
+    MGlobal::displayWarning("cleanRigidBody0");
+    // Remove it from the world
+    this->dynamicsWorld->removeRigidBody(body);
+    MGlobal::displayWarning("cleanRigidBody1");
+
+    // Delete the motion state and the rigid body to avoid memory leaks
+    delete body->getMotionState();
+    MGlobal::displayWarning("cleanRigidBody2");
+    delete body;
+    MGlobal::displayWarning("cleanRigidBody3");
+    body = nullptr; // Ensure the pointer is reset to nullptr after deletion
+    MGlobal::displayWarning("cleanRigidBody4");
 }
 
 void BulletCollisionHandler::updateColliders(std::vector<MFnMesh*> collidersMFnMeshes, MFnMesh* excludeMesh)
@@ -144,15 +190,10 @@ void BulletCollisionHandler::updateColliders(std::vector<MFnMesh*> collidersMFnM
         }
 
         btRigidBody* rigidBody = this->createFullColliderFromMFnMesh(mfnMesh);
-
-        // Add the new rigid body to the dynamics world
-        //this->dynamicsWorld->addRigidBody(rigidBody, 1, 1);
         this->dynamicsWorld->addRigidBody(rigidBody, btBroadphaseProxy::StaticFilter, btBroadphaseProxy::AllFilter);
-
-        // Keep a reference to the collider for later removal or other operations
         this->colliders.push_back(rigidBody);
-        MGlobal::displayInfo("Collider was added..." + MString() + mfnMesh->fullPathName());
     }
+    MGlobal::displayInfo("Colliders were updated!");
 }
 
 btRigidBody* BulletCollisionHandler::createFullColliderFromMFnMesh(MFnMesh* mfnMesh) {
@@ -169,13 +210,11 @@ btRigidBody* BulletCollisionHandler::createFullColliderFromMFnMesh(MFnMesh* mfnM
     rigidBody->setCollisionFlags(rigidBody->getCollisionFlags() | btCollisionObject::CF_STATIC_OBJECT);
     rigidBody->setActivationState(DISABLE_DEACTIVATION);
 
-    rigidBody->setRestitution(0.05);
+    rigidBody->setRestitution(0.001);
     rigidBody->setFriction(0.1);
     rigidBody->setRollingFriction(0.1);
     rigidBody->setSpinningFriction(0.1);
     rigidBody->setDamping(0.1, 0.1);
-
-    //ADD MASS AND INERTIA FOR STATIC COLLIDERS
     return rigidBody;
 }
 
@@ -198,7 +237,7 @@ btRigidBody* BulletCollisionHandler::createFullActiveRigidBodyFromMFnMesh(MFnMes
     btRigidBody::btRigidBodyConstructionInfo rbInfo(mass, motionState, collisionShape, localInertia);
     btRigidBody* rigidBody = new btRigidBody(rbInfo);
 
-    rigidBody->setRestitution(0.05);
+    rigidBody->setRestitution(0.001);
     rigidBody->setFriction(0.15);
     rigidBody->setRollingFriction(0.15);
     rigidBody->setSpinningFriction(0.15);
@@ -252,9 +291,6 @@ btCollisionShape* BulletCollisionHandler::convertMFnMeshToStaticCollisionShape(M
 
     // Index variables for triangleVertices
     int triangleIndex = 0;
-    MGlobal::displayInfo(MString("-----GENERATING COLLIDER FOR MESH: ") + MString() + mfnMesh->fullPathName());
-
-    // Loop through the number of triangles
     for (unsigned int i = 0; i < triangleCounts.length(); ++i) {
         for (int j = 0; j < triangleCounts[i]; ++j) {
             btVector3 vertices[3];
@@ -278,8 +314,6 @@ btCollisionShape* BulletCollisionHandler::convertMFnMeshToStaticCollisionShape(M
             // Add the triangle to the mesh
             //triMesh->addTriangle(vertices[0], vertices[2], vertices[1]);
             triMesh->addTriangle(vertices[0], vertices[1], vertices[2]);
-
-            MGlobal::displayInfo(MString("vertex pos of collider ") + vertices->getX() + ", " + vertices->getY() + ", " + vertices->getZ());
 
             // Move to the next set of vertices
             triangleIndex += 3;

@@ -11,8 +11,11 @@
 class BulletCollisionHandler 
 {
     public:
-        BulletCollisionHandler();
-        ~BulletCollisionHandler();
+        static BulletCollisionHandler& getInstance();
+
+        // Delete copy constructor and copy assignment operator to prevent copies of the singleton
+        BulletCollisionHandler(const BulletCollisionHandler&) = delete;
+        BulletCollisionHandler& operator=(const BulletCollisionHandler&) = delete;
 
         void createDynamicsWorld();
         void deleteDynamicsWorld();
@@ -25,6 +28,7 @@ class BulletCollisionHandler
 
 
         MMatrix getActiveObjectTransformMMatrix();
+        bool isRigidBodyInWorld(btRigidBody* body);
 
         btCollisionShape* convertMFnMeshToActiveCollisionShape(MFnMesh* mfnMesh);
         btCollisionShape* convertMFnMeshToStaticCollisionShape(MFnMesh * mfnMesh);
@@ -42,6 +46,12 @@ class BulletCollisionHandler
         btDiscreteDynamicsWorld* dynamicsWorld;
 
     private:
+        BulletCollisionHandler();  // Constructor is private
+        ~BulletCollisionHandler();  // Constructor is private
+        static void initSingleton();
+        static BulletCollisionHandler* instance;
+        static std::once_flag initInstanceFlag;
+
         btBroadphaseInterface* broadphase;
         btDefaultCollisionConfiguration* collisionConfiguration;
         btCollisionDispatcher* dispatcher;
