@@ -258,9 +258,25 @@ btRigidBody* BulletCollisionHandler::createFullColliderFromMFnMesh(MFnMesh* mfnM
 }
 
 btRigidBody* BulletCollisionHandler::createFullActiveRigidBodyFromMFnMesh(MFnMesh* mfnMesh) {
-    //btCollisionShape* collisionShape = this->convertMFnMeshToStaticCollisionShape(mfnMesh);
-    
     btCollisionShape* collisionShape = this->convertMFnMeshToActiveCollisionShape(mfnMesh);
+
+    // Get the DAG path of the mesh
+    MDagPath dagPath;
+    MFnDagNode dagNode(mfnMesh->object());
+    dagNode.getPath(dagPath);
+
+    // Get the world transformation matrix
+    MStatus status;
+    MMatrix mayaTransformMatrix = dagPath.inclusiveMatrix(&status);
+
+    // Extract scale from Maya's transformation matrix
+    MTransformationMatrix transMatrix(mayaTransformMatrix);
+    double scale[3];
+    transMatrix.getScale(scale, MSpace::kTransform);
+
+    // Apply scale to the collision shape
+    btVector3 bulletScale(scale[0], scale[1], scale[2]);
+    collisionShape->setLocalScaling(bulletScale);
     collisionShape->setMargin(0.05);
 
     // Convert Maya's transformation matrix to Bullet's btTransform
@@ -281,17 +297,13 @@ btRigidBody* BulletCollisionHandler::createFullActiveRigidBodyFromMFnMesh(MFnMes
     rigidBody->setRollingFriction(0.15);
     rigidBody->setSpinningFriction(0.15);
     rigidBody->setDamping(0.15, 0.15);
-    //rigidBody->setContactStiffnessAndDamping(0, 0.1);
+    //rigidBody->getContactStiffness();
 
     rigidBody->setCollisionFlags(rigidBody->getCollisionFlags() | btCollisionObject::CF_DYNAMIC_OBJECT);
     rigidBody->setActivationState(DISABLE_DEACTIVATION);
 
     // Add rigid body to the dynamics world and set up proxy object
     this->dynamicsWorld->addRigidBody(rigidBody, btBroadphaseProxy::DefaultFilter, btBroadphaseProxy::AllFilter);
-    MString info_msg = "BulletCollisionHandler: Active object updated and added to the dynamicsWorld.";
-    MGlobal::displayInfo(info_msg);
-
-    MGlobal::displayInfo("CREATING MESHES FOR ACTIVE OBJECTS");
 
     return rigidBody;
 }
