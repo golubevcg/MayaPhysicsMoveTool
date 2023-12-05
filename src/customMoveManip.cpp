@@ -51,7 +51,6 @@ MStatus CustomMoveManip::connectToDependNode(const MObject& node) {
     return stat;
 }
 
-// Viewport 2.0 manipulator draw overrides
 void CustomMoveManip::updateManipLocations(const MObject& node)
 //
 // Description
@@ -113,21 +112,41 @@ MStatus CustomMoveManip::doDrag() {
 
     // Read transform from active object.
     MMatrix activeObjectUpdatedMatrix = this->bulletCollisionHandler.getActiveObjectTransformMMatrix();
-    this->applyTransformToActiveObjectTransform(activeObjectUpdatedMatrix);
+    this->applyTransformAndRotateToActiveObjectTransform(activeObjectUpdatedMatrix);
     
     return MS::kUnknownParameter;
 }
 
 
-void CustomMoveManip::applyTransformToActiveObjectTransform(MMatrix matrix) {
+void CustomMoveManip::applyTransformAndRotateToActiveObjectTransform(MMatrix matrix) {
     MFnDagNode& activeDagNode = this->collisionCandidatesFinder.activeTransformMFnDagNode;
 
     MDagPath dagPath;
     activeDagNode.getPath(dagPath);
 
     MFnTransform activeTransform(dagPath);
-    MStatus status = activeTransform.set(MTransformationMatrix(matrix));
+
+    // Create an MTransformationMatrix from the input MMatrix
+    MTransformationMatrix transMatrix(matrix);
+
+    // Extract the translation from the MTransformationMatrix
+    MVector translation = transMatrix.getTranslation(MSpace::kTransform);
+
+    // Extract the rotation as a quaternion
+    MQuaternion rotation;
+    transMatrix.getRotationQuaternion(rotation.x, rotation.y, rotation.z, rotation.w);
+
+    // Apply only the translation and rotation to the active transform
+    MStatus status = activeTransform.setTranslation(translation, MSpace::kTransform);
     if (!status) {
-        MGlobal::displayError("Error setting transformation: " + status.errorString());
+        MGlobal::displayError("Error setting translation: " + status.errorString());
+        return;
+    }
+
+    status = activeTransform.setRotation(rotation);
+    if (!status) {
+        MGlobal::displayError("Error setting rotation: " + status.errorString());
+        return;
     }
 }
+

@@ -430,6 +430,18 @@ MMatrix BulletCollisionHandler::convertBulletToMayaMatrix(const btTransform& bul
     mayaMatrix[3][1] = -bulletTranslation.getZ();  // Inverting Z axis
     mayaMatrix[3][2] = bulletTranslation.getY();  // Swapping Y and Z
 
+    // Reset the scale component of the matrix to 1
+    for (int i = 0; i < 3; ++i) {
+        double length = sqrt(mayaMatrix[i][0] * mayaMatrix[i][0] +
+            mayaMatrix[i][1] * mayaMatrix[i][1] +
+            mayaMatrix[i][2] * mayaMatrix[i][2]);
+        if (length != 0) {
+            for (int j = 0; j < 3; ++j) {
+                mayaMatrix[i][j] /= length;
+            }
+        }
+    }
+
     return mayaMatrix;
 }
 

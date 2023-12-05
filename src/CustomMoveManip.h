@@ -16,7 +16,7 @@ public:
     MStatus connectToDependNode(const MObject&) override;
     MStatus doDrag() override;
     MStatus doPress() override;
-    void applyTransformToActiveObjectTransform(MMatrix matrix);
+    void applyTransformAndRotateToActiveObjectTransform(MMatrix matrix);
 
 private:
     void updateManipLocations(const MObject& node);
