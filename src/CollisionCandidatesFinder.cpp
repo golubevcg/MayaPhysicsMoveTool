@@ -1,13 +1,24 @@
+#include <mutex>
 #include "CollisionCandidatesFinder.h"
 
 
-CollisionCandidatesFinder::CollisionCandidatesFinder(): 
-    activeMFnMesh(nullptr) {
-    MGlobal::displayWarning("---CollisionCandidatesFinder CONSTRUCTOR");
+CollisionCandidatesFinder* CollisionCandidatesFinder::instance = nullptr;
+std::once_flag CollisionCandidatesFinder::initInstanceFlag;
+
+CollisionCandidatesFinder& CollisionCandidatesFinder::getInstance() {
+    std::call_once(initInstanceFlag, &CollisionCandidatesFinder::initSingleton);
+    return *instance;
+}
+
+void CollisionCandidatesFinder::initSingleton() {
+    instance = new CollisionCandidatesFinder();
+}
+
+CollisionCandidatesFinder::CollisionCandidatesFinder() {
+
 }
 
 CollisionCandidatesFinder::~CollisionCandidatesFinder() {
-    /*
     for (MFnMesh* mesh : this->allSceneMFnMeshes) {
         delete mesh;
     }
@@ -79,6 +90,12 @@ MStatus CollisionCandidatesFinder::getSceneMFnMeshes() {
         MFnMesh* fnMesh = new MFnMesh(dagPath, &status);
         if (status != MS::kSuccess) {
             MGlobal::displayError("MFnMesh initialization failed");
+            continue;
+        }
+
+        MBoundingBox boundingBox = fnMesh->boundingBox(&status);
+        if (status != MS::kSuccess) {
+            MGlobal::displayError("Failed to get bounding box");
             continue;
         }
 

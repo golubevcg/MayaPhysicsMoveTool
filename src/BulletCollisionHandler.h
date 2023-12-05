@@ -5,15 +5,13 @@
 #define BULLET_COLLISION_HANDLER_H
 
 #include <vector>
+#include <unordered_map>
 #include "btBulletDynamicsCommon.h"
 
 class BulletCollisionHandler 
 {
     public:
-        static BulletCollisionHandler& getInstance() {
-            static BulletCollisionHandler instance;
-            return instance;
-        }
+        static BulletCollisionHandler& getInstance();
 
         // Delete copy constructor and copy assignment operator to prevent copies of the singleton
         BulletCollisionHandler(const BulletCollisionHandler&) = delete;
@@ -24,11 +22,16 @@ class BulletCollisionHandler
 
         void cleanRigidBody(btRigidBody* body);
         void updateActiveObject(MFnMesh* mesh);
-        void updateColliders(std::vector<MFnMesh*> collidersMFnMeshes);
+        void updateColliders(std::vector<MFnMesh*> collidersMFnMeshes, MFnMesh* excludeMesh);
+
+        void clearColliders();
+        void deleteCollider(btRigidBody* collider);
+
         btRigidBody* createFullColliderFromMFnMesh(MFnMesh* mfnMesh);
         btRigidBody* createFullActiveRigidBodyFromMFnMesh(MFnMesh* mfnMesh);
 
         MMatrix getActiveObjectTransformMMatrix();
+        bool isRigidBodyInWorld(btRigidBody* body);
 
         btCollisionShape* convertMFnMeshToActiveCollisionShape(MFnMesh* mfnMesh);
         btCollisionShape* convertMFnMeshToStaticCollisionShape(MFnMesh * mfnMesh);
@@ -42,12 +45,15 @@ class BulletCollisionHandler
 
         btRigidBody* activeRigidBody;
         btRigidBody* proxyRigidBody;
-        std::vector<btRigidBody*> colliders;
-
+        std::unordered_map<std::string, btRigidBody*> colliders;
         btDiscreteDynamicsWorld* dynamicsWorld;
+
     private:
-        BulletCollisionHandler();
-        ~BulletCollisionHandler();
+        BulletCollisionHandler();  // Constructor is private
+        ~BulletCollisionHandler();  // Constructor is private
+        static void initSingleton();
+        static BulletCollisionHandler* instance;
+        static std::once_flag initInstanceFlag;
 
         btBroadphaseInterface* broadphase;
         btDefaultCollisionConfiguration* collisionConfiguration;

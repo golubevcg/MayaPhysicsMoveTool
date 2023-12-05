@@ -1,12 +1,24 @@
-// MayaToBulletUtils.cpp
-
 #include <string>
+#include <mutex>
 #include <MayaIncludes.h>
 #include "BulletCollisionHandler.h"
 #include <BulletCollision/Gimpact/btGImpactShape.h>
 #include <BulletCollision/Gimpact/btGImpactCollisionAlgorithm.h>
 #include <LinearMath/btAlignedObjectArray.h>
 #include <btBulletDynamicsCommon.h>
+
+
+BulletCollisionHandler* BulletCollisionHandler::instance = nullptr;
+std::once_flag BulletCollisionHandler::initInstanceFlag;
+
+BulletCollisionHandler& BulletCollisionHandler::getInstance() {
+    std::call_once(initInstanceFlag, &BulletCollisionHandler::initSingleton);
+    return *instance;
+}
+
+void BulletCollisionHandler::initSingleton() {
+    instance = new BulletCollisionHandler();
+}
 
 BulletCollisionHandler::BulletCollisionHandler(): 
     broadphase(nullptr),
@@ -15,8 +27,8 @@ BulletCollisionHandler::BulletCollisionHandler():
     solver(nullptr),
     dynamicsWorld(nullptr),
     activeRigidBody(nullptr),
-    proxyRigidBody(nullptr){
-    MGlobal::displayWarning("---BulletCollisionHandler CONSTRUCTOR");
+    proxyRigidBody(nullptr) {
+    MGlobal::displayInfo("CONSTRUUUCTOOOOOOOOOR");
 }
 
 BulletCollisionHandler::~BulletCollisionHandler() {
@@ -24,13 +36,16 @@ BulletCollisionHandler::~BulletCollisionHandler() {
 }
 
 void BulletCollisionHandler::createDynamicsWorld() {
-    this->broadphase = new btDbvtBroadphase();
-    this->collisionConfiguration = new btDefaultCollisionConfiguration();
-    this->dispatcher = new btCollisionDispatcher(collisionConfiguration);
-    this->solver = new btSequentialImpulseConstraintSolver;
+    if (this->dynamicsWorld == nullptr) {
+        // Create the dynamics world
+        this->broadphase = new btDbvtBroadphase();
+        this->collisionConfiguration = new btDefaultCollisionConfiguration();
+        this->dispatcher = new btCollisionDispatcher(collisionConfiguration);
+        this->solver = new btSequentialImpulseConstraintSolver;
 
-    this->dynamicsWorld = new btDiscreteDynamicsWorld(dispatcher, broadphase, solver, collisionConfiguration);
-    this->dynamicsWorld->setGravity(btVector3(0, 0, 0));
+        this->dynamicsWorld = new btDiscreteDynamicsWorld(dispatcher, broadphase, solver, collisionConfiguration);
+        this->dynamicsWorld->setGravity(btVector3(0, 0, 0));
+    }
 }
 
 void BulletCollisionHandler::deleteDynamicsWorld() {
@@ -107,48 +122,115 @@ MMatrix BulletCollisionHandler::getActiveObjectTransformMMatrix() {
     return MMatrix::identity;
 }
 
-void BulletCollisionHandler::cleanRigidBody(btRigidBody* body) {
-    if (body) {
-        // Remove it from the world
-        this->dynamicsWorld->removeRigidBody(body);
-
-        // Delete the motion state and the rigid body to avoid memory leaks
-        delete body->getMotionState();
-        delete body;
-        body = nullptr; // Ensure the pointer is reset to nullptr after deletion
+bool BulletCollisionHandler::isRigidBodyInWorld(btRigidBody* body) {
+    if (!body || !this->dynamicsWorld) {
+        return false;
     }
-}
 
-void BulletCollisionHandler::updateColliders(std::vector<MFnMesh*> collidersMFnMeshes)
-{
-    // Remove all existing colliders from the world and delete them
-    for (auto& collider : this->colliders) {
-        if (collider) {
-            this->dynamicsWorld->removeCollisionObject(collider);
-            delete collider->getCollisionShape();
-            btRigidBody* body = btRigidBody::upcast(collider);
-            if (body && body->getMotionState()) {
-                delete body->getMotionState();
-            }
-            delete collider;
+    int numObjects = this->dynamicsWorld->getNumCollisionObjects();
+    for (int i = 0; i < numObjects; ++i) {
+        btCollisionObject* obj = this->dynamicsWorld->getCollisionObjectArray()[i];
+        if (obj == body) {
+            return true;
         }
     }
-    this->colliders.clear();
+
+    return false;
+}
+
+
+void BulletCollisionHandler::cleanRigidBody(btRigidBody* body) {
+    if (!body) {
+        return;
+    }
+
+    if (this->dynamicsWorld == nullptr) {
+        return;
+    }
+
+    if (!this->isRigidBodyInWorld(body)) {
+        return;
+    }
+
+    // Remove it from the world
+    this->dynamicsWorld->removeRigidBody(body);
+
+    // Delete the motion state and the rigid body to avoid memory leaks
+    delete body->getMotionState();
+    delete body;
+    body = nullptr; // Ensure the pointer is reset to nullptr after deletion
+}
+
+void BulletCollisionHandler::updateColliders(std::vector<MFnMesh*> collidersMFnMeshes, MFnMesh* excludeMesh) {
+
+    /*
+    if you already had colliders then update existing ones
+    else
+    create new ones
+    */
+
+    std::vector <std::string> collidersToRemove;
 
     // Add new colliders based on the provided MFnMeshes
     for (auto& mfnMesh : collidersMFnMeshes) {
+        std::string fullPathName = mfnMesh->fullPathName().asChar();
+
+        bool colliderAlreadyCreated = false;
+        auto it = this->colliders.find(fullPathName);
+        if (it != this->colliders.end()) {
+            colliderAlreadyCreated = true;
+        }
+
+        if (excludeMesh != nullptr && excludeMesh->fullPathName() == mfnMesh->fullPathName()) {
+            if (colliderAlreadyCreated) {
+                collidersToRemove.push_back(fullPathName);
+            }
+            // if excludeMesh inside colliders then remove it from map and world
+            continue;
+        }
+
+        if (colliderAlreadyCreated) {
+            continue;
+        }
 
         btRigidBody* rigidBody = this->createFullColliderFromMFnMesh(mfnMesh);
-
-        // Add the new rigid body to the dynamics world
-        //this->dynamicsWorld->addRigidBody(rigidBody, 1, 1);
         this->dynamicsWorld->addRigidBody(rigidBody, btBroadphaseProxy::StaticFilter, btBroadphaseProxy::AllFilter);
-
-        // Keep a reference to the collider for later removal or other operations
-        this->colliders.push_back(rigidBody);
-        MGlobal::displayInfo("Collider was added..." + MString() + mfnMesh->fullPathName());
+        this->colliders[fullPathName] = rigidBody;
     }
+
+    if (!collidersToRemove.empty()) {
+        for (const std::string & colliderName : collidersToRemove) {
+            MGlobal::displayWarning("removing collider: " + MString(colliderName.c_str()));
+            btRigidBody* bodyToRemove = this->colliders[colliderName];
+            this->deleteCollider(bodyToRemove);
+
+            colliders.erase(colliderName);
+        }
+
+    }
+    MGlobal::displayInfo("Colliders were updated!");
 }
+
+void BulletCollisionHandler::clearColliders() {
+    // Remove all existing colliders from the world and delete them
+    for (auto& pair : this->colliders) {
+        btRigidBody* collider = pair.second;
+        if (collider) {
+            this->deleteCollider(collider);
+        }
+    }
+    this->colliders.clear();
+}
+
+void BulletCollisionHandler::deleteCollider(btRigidBody* collider) {
+    this->dynamicsWorld->removeCollisionObject(collider);
+    delete collider->getCollisionShape();
+    if (collider->getMotionState()) {
+        delete collider->getMotionState();
+    }
+    delete collider;
+}
+
 
 btRigidBody* BulletCollisionHandler::createFullColliderFromMFnMesh(MFnMesh* mfnMesh) {
     btCollisionShape* newShape = this->convertMFnMeshToStaticCollisionShape(mfnMesh);
@@ -164,20 +246,35 @@ btRigidBody* BulletCollisionHandler::createFullColliderFromMFnMesh(MFnMesh* mfnM
     rigidBody->setCollisionFlags(rigidBody->getCollisionFlags() | btCollisionObject::CF_STATIC_OBJECT);
     rigidBody->setActivationState(DISABLE_DEACTIVATION);
 
-    rigidBody->setRestitution(0);
+    rigidBody->setRestitution(0.001);
     rigidBody->setFriction(0.1);
     rigidBody->setRollingFriction(0.1);
     rigidBody->setSpinningFriction(0.1);
     rigidBody->setDamping(0.1, 0.1);
 
-    //ADD MASS AND INERTIA FOR STATIC COLLIDERS
     return rigidBody;
 }
 
 btRigidBody* BulletCollisionHandler::createFullActiveRigidBodyFromMFnMesh(MFnMesh* mfnMesh) {
-    //btCollisionShape* collisionShape = this->convertMFnMeshToStaticCollisionShape(mfnMesh);
-    
     btCollisionShape* collisionShape = this->convertMFnMeshToActiveCollisionShape(mfnMesh);
+
+    // Get the DAG path of the mesh
+    MDagPath dagPath;
+    MFnDagNode dagNode(mfnMesh->object());
+    dagNode.getPath(dagPath);
+
+    // Get the world transformation matrix
+    MStatus status;
+    MMatrix mayaTransformMatrix = dagPath.inclusiveMatrix(&status);
+
+    // Extract scale from Maya's transformation matrix
+    MTransformationMatrix transMatrix(mayaTransformMatrix);
+    double scale[3];
+    transMatrix.getScale(scale, MSpace::kTransform);
+
+    // Apply scale to the collision shape
+    btVector3 bulletScale(scale[0], scale[1], scale[2]);
+    collisionShape->setLocalScaling(bulletScale);
     collisionShape->setMargin(0.05);
 
     // Convert Maya's transformation matrix to Bullet's btTransform
@@ -193,22 +290,18 @@ btRigidBody* BulletCollisionHandler::createFullActiveRigidBodyFromMFnMesh(MFnMes
     btRigidBody::btRigidBodyConstructionInfo rbInfo(mass, motionState, collisionShape, localInertia);
     btRigidBody* rigidBody = new btRigidBody(rbInfo);
 
-    rigidBody->setRestitution(0);
+    rigidBody->setRestitution(0.001);
     rigidBody->setFriction(0.15);
     rigidBody->setRollingFriction(0.15);
     rigidBody->setSpinningFriction(0.15);
     rigidBody->setDamping(0.15, 0.15);
-    //rigidBody->setContactStiffnessAndDamping(0, 0.1);
+    //rigidBody->getContactStiffness();
 
     rigidBody->setCollisionFlags(rigidBody->getCollisionFlags() | btCollisionObject::CF_DYNAMIC_OBJECT);
     rigidBody->setActivationState(DISABLE_DEACTIVATION);
 
     // Add rigid body to the dynamics world and set up proxy object
     this->dynamicsWorld->addRigidBody(rigidBody, btBroadphaseProxy::DefaultFilter, btBroadphaseProxy::AllFilter);
-    MString info_msg = "BulletCollisionHandler: Active object updated and added to the dynamicsWorld.";
-    MGlobal::displayInfo(info_msg);
-
-    MGlobal::displayInfo("CREATING MESHES FOR ACTIVE OBJECTS");
 
     return rigidBody;
 }
@@ -247,9 +340,6 @@ btCollisionShape* BulletCollisionHandler::convertMFnMeshToStaticCollisionShape(M
 
     // Index variables for triangleVertices
     int triangleIndex = 0;
-    MGlobal::displayInfo(MString("-----GENERATING COLLIDER FOR MESH: ") + MString() + mfnMesh->fullPathName());
-
-    // Loop through the number of triangles
     for (unsigned int i = 0; i < triangleCounts.length(); ++i) {
         for (int j = 0; j < triangleCounts[i]; ++j) {
             btVector3 vertices[3];
@@ -273,8 +363,6 @@ btCollisionShape* BulletCollisionHandler::convertMFnMeshToStaticCollisionShape(M
             // Add the triangle to the mesh
             //triMesh->addTriangle(vertices[0], vertices[2], vertices[1]);
             triMesh->addTriangle(vertices[0], vertices[1], vertices[2]);
-
-            MGlobal::displayInfo(MString("vertex pos of collider ") + vertices->getX() + ", " + vertices->getY() + ", " + vertices->getZ());
 
             // Move to the next set of vertices
             triangleIndex += 3;
@@ -352,5 +440,18 @@ MMatrix BulletCollisionHandler::convertBulletToMayaMatrix(const btTransform& bul
     mayaMatrix[3][1] = -bulletTranslation.getZ();  // Inverting Z axis
     mayaMatrix[3][2] = bulletTranslation.getY();  // Swapping Y and Z
 
+    // Reset the scale component of the matrix to 1
+    for (int i = 0; i < 3; ++i) {
+        double length = sqrt(mayaMatrix[i][0] * mayaMatrix[i][0] +
+            mayaMatrix[i][1] * mayaMatrix[i][1] +
+            mayaMatrix[i][2] * mayaMatrix[i][2]);
+        if (length != 0) {
+            for (int j = 0; j < 3; ++j) {
+                mayaMatrix[i][j] /= length;
+            }
+        }
+    }
+
     return mayaMatrix;
 }
+

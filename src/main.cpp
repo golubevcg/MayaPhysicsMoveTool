@@ -1,31 +1,29 @@
+#include <CustomMoveManip.h>
+#include <CustomMoveManipContext.h>
 #include <maya/MFnPlugin.h>
 #include <MayaIncludes.h>
-#include <CustomMoveManipContext.h>
-
 //
-// moveManipContextCommand
+// moveManipContext
 // This is the command that will be used to create instances
 // of our context.
-//
 class CustomMoveManipContextCommand : public MPxContextCommand {
-public:
-    CustomMoveManipContextCommand() {};
-    MPxContext* makeObj() override;
-public:
-    static void* creator();
+    public:
+        CustomMoveManipContextCommand() {};
+        MPxContext* makeObj() override;
+        static void* creator();
 };
-
 
 MPxContext* CustomMoveManipContextCommand::makeObj() {
     return new CustomMoveManipContext();
 }
 
 void* CustomMoveManipContextCommand::creator() {
-    return new CustomMoveManipContext();
+    return new CustomMoveManipContextCommand;
 }
 
 //
-// register/unregister the context and manipulator
+// The following routines are used to register/unregister
+// the context and manipulator
 //
 MStatus initializePlugin(MObject obj) {
     MStatus status;
@@ -36,7 +34,6 @@ MStatus initializePlugin(MObject obj) {
         MGlobal::displayError("Error registering customMoveManipContext command");
         return status;
     }
-
     status = plugin.registerNode("customMoveManip", CustomMoveManip::id,
         &CustomMoveManip::creator, &CustomMoveManip::initialize,
         MPxNode::kManipContainer);

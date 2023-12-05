@@ -8,24 +8,24 @@
 class CustomMoveManip : public MPxManipContainer {
 public:
     CustomMoveManip();
+    ~CustomMoveManip() override;
 
     static void* creator();
     static MStatus initialize();
     MStatus createChildren() override;
-    MStatus connectToDependNode(const MObject& node) override;
+    MStatus connectToDependNode(const MObject&) override;
     MStatus doDrag() override;
     MStatus doPress() override;
-    void setupCollisions();
-    void applyTransformToActiveObjectTransform(const MMatrix matrix);
+    void applyTransformAndRotateToActiveObjectTransform(MMatrix matrix);
 
 private:
     void updateManipLocations(const MObject& node);
+public:
+    MDagPath fFreePointManipDagPath;
+    static MTypeId id;
     CollisionCandidatesFinder& collisionCandidatesFinder;
     BulletCollisionHandler& bulletCollisionHandler;
-
-public:
-    static MTypeId id;
-    MDagPath fFreePointManipDagPath;
 };
+
 
 #endif // CUSTOM_MOVE_MANIP_H

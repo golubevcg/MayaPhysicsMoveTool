@@ -1,26 +1,18 @@
 #include <CustomMoveManip.h>
+#include <MayaIncludes.h>
 
 MTypeId CustomMoveManip::id(0x8001d);
 
-CustomMoveManip::CustomMoveManip()       
-    :bulletCollisionHandler(BulletCollisionHandler::getInstance()),
-    collisionCandidatesFinder(CollisionCandidatesFinder::getInstance()) {
-    MGlobal::displayWarning("---CUSTOMMOVEMANIP CONSTRUCTOR");
+CustomMoveManip::CustomMoveManip():
+        bulletCollisionHandler(BulletCollisionHandler::getInstance()),
+        collisionCandidatesFinder(CollisionCandidatesFinder::getInstance()) {
 }
 
-void CustomMoveManip::setupCollisions() {
-    MGlobal::displayWarning("---CUSTOMMOVEMANIP setupCollisions");
-    this->collisionCandidatesFinder.addActiveObject();
-    this->collisionCandidatesFinder.getSceneMFnMeshes();
-
-    this->bulletCollisionHandler.createDynamicsWorld();
-
-    this->bulletCollisionHandler.updateActiveObject(this->collisionCandidatesFinder.activeMFnMesh);
-    this->bulletCollisionHandler.updateColliders(this->collisionCandidatesFinder.allSceneMFnMeshes);
+CustomMoveManip::~CustomMoveManip() {
+    MGlobal::displayInfo("out of destructor!!!!");
 }
 
 void* CustomMoveManip::creator() {
-    MGlobal::displayWarning("---CUSTOMMOVEMANIP CREATOR");
     return new CustomMoveManip();
 }
 
@@ -51,10 +43,6 @@ MStatus CustomMoveManip::connectToDependNode(const MObject& node) {
     MFnDependencyNode nodeFn(node);
     MPlug tPlug = nodeFn.findPlug("translate", true, &stat);
     MFnFreePointTriadManip freePointManipFn(this->fFreePointManipDagPath);
-    //freePointManipFn.connectToPointPlug(tPlug);
-
-    //create rotate manip
-    // create scale manip (BUT CHECK IF YOU CAN MODIFY THEIR VISIBILITY
     this->updateManipLocations(node);
     this->finishAddingManips();
     MPxManipContainer::connectToDependNode(node);
@@ -80,16 +68,14 @@ void CustomMoveManip::updateManipLocations(const MObject& node) {
     MTransformationMatrix::RotationOrder rOrder;
     originalTM.getRotation(rot, rOrder);
 
-    manipFn.setRotation(rot, rOrder);
-    manipFn.setTranslation(originalTM.getTranslation(MSpace::kTransform), MSpace::kTransform);
+    //manipFn.setRotation(rot, rOrder);
+    manipFn.setTranslation(originalTM.getTranslation(MSpace::kWorld), MSpace::kWorld);
 
     MStatus status;
 }
 
 MStatus CustomMoveManip::doPress() {
-    MGlobal::displayWarning("---CUSTOMMOVEMANIP doPress");
     MStatus status = MPxManipContainer::doPress();
-
     return status;
 }
 
@@ -97,14 +83,17 @@ MStatus CustomMoveManip::doDrag() {
     MGlobal::displayWarning("---CUSTOMMOVEMANIP doDrag");
 
     // Update the world.
-    this->bulletCollisionHandler.updateWorld(5);
+
+    this->bulletCollisionHandler.updateWorld(5.0);
 
     // Read translation from manip.
     MFnManip3D manipFn(this->fFreePointManipDagPath);
     MPoint currentPosition;
+
     this->getConverterManipValue(0, currentPosition);
     MPoint currentTranslation = manipFn.translation(MSpace::kWorld);
 
+    // Get the current position of the rigid body
     btVector3 currentPos = this->bulletCollisionHandler.activeRigidBody->getWorldTransform().getOrigin();
     btVector3 targetPos(
         currentPosition.x + currentTranslation.x,
@@ -113,32 +102,51 @@ MStatus CustomMoveManip::doDrag() {
     );
 
     float timeStep = 1.0f / 60.0f;
-    btVector3 requiredVelocity = (targetPos - currentPos) / timeStep;
-    this->bulletCollisionHandler.activeRigidBody->setLinearVelocity(requiredVelocity * 0.01 * 0.5);
 
-    // Update world again for accuracy.
+    // Calculate the required velocity to reach the target position in one time step
+    btVector3 requiredVelocity = (targetPos - currentPos) / timeStep;
+
+    // Apply this velocity to the rigid body
+    this->bulletCollisionHandler.activeRigidBody->setLinearVelocity(requiredVelocity*0.01);
     this->bulletCollisionHandler.updateWorld(50);
 
     // Read transform from active object.
     MMatrix activeObjectUpdatedMatrix = this->bulletCollisionHandler.getActiveObjectTransformMMatrix();
-    this->applyTransformToActiveObjectTransform(activeObjectUpdatedMatrix);
-
-    btVector3 transformV = this->bulletCollisionHandler.activeRigidBody->getWorldTransform().getOrigin();
+    this->applyTransformAndRotateToActiveObjectTransform(activeObjectUpdatedMatrix);
+    
     return MS::kUnknownParameter;
 }
 
 
-void CustomMoveManip::applyTransformToActiveObjectTransform(MMatrix matrix) {
-    // Get the MFnDagNode of the active object
+void CustomMoveManip::applyTransformAndRotateToActiveObjectTransform(MMatrix matrix) {
     MFnDagNode& activeDagNode = this->collisionCandidatesFinder.activeTransformMFnDagNode;
 
     MDagPath dagPath;
     activeDagNode.getPath(dagPath);
 
     MFnTransform activeTransform(dagPath);
-    MStatus status = activeTransform.set(MTransformationMatrix(matrix));
+
+    // Create an MTransformationMatrix from the input MMatrix
+    MTransformationMatrix transMatrix(matrix);
+
+    // Extract the translation from the MTransformationMatrix
+    MVector translation = transMatrix.getTranslation(MSpace::kTransform);
+
+    // Extract the rotation as a quaternion
+    MQuaternion rotation;
+    transMatrix.getRotationQuaternion(rotation.x, rotation.y, rotation.z, rotation.w);
+
+    // Apply only the translation and rotation to the active transform
+    MStatus status = activeTransform.setTranslation(translation, MSpace::kTransform);
     if (!status) {
-        // Handle the error if the transformation could not be set
-        MGlobal::displayError("Error setting transformation: " + status.errorString());
+        MGlobal::displayError("Error setting translation: " + status.errorString());
+        return;
+    }
+
+    status = activeTransform.setRotation(rotation);
+    if (!status) {
+        MGlobal::displayError("Error setting rotation: " + status.errorString());
+        return;
     }
 }
+
