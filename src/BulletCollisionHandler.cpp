@@ -36,16 +36,16 @@ BulletCollisionHandler::~BulletCollisionHandler() {
 }
 
 void BulletCollisionHandler::createDynamicsWorld() {
-    MGlobal::displayInfo("------createDynamicsWorld");
+    if (this->dynamicsWorld == nullptr) {
+        // Create the dynamics world
+        this->broadphase = new btDbvtBroadphase();
+        this->collisionConfiguration = new btDefaultCollisionConfiguration();
+        this->dispatcher = new btCollisionDispatcher(collisionConfiguration);
+        this->solver = new btSequentialImpulseConstraintSolver;
 
-    // Create the dynamics world
-    this->broadphase = new btDbvtBroadphase();
-    this->collisionConfiguration = new btDefaultCollisionConfiguration();
-    this->dispatcher = new btCollisionDispatcher(collisionConfiguration);
-    this->solver = new btSequentialImpulseConstraintSolver;
-
-    this->dynamicsWorld = new btDiscreteDynamicsWorld(dispatcher, broadphase, solver, collisionConfiguration);
-    this->dynamicsWorld->setGravity(btVector3(0, 0, 0));
+        this->dynamicsWorld = new btDiscreteDynamicsWorld(dispatcher, broadphase, solver, collisionConfiguration);
+        this->dynamicsWorld->setGravity(btVector3(0, 0, 0));
+    }
 }
 
 void BulletCollisionHandler::deleteDynamicsWorld() {
@@ -87,7 +87,6 @@ void BulletCollisionHandler::deleteDynamicsWorld() {
 }
 
 void BulletCollisionHandler::updateWorld(float framesToUpdate) {
-    MGlobal::displayWarning("UPDATE WORLD!!!");
     float fps = 60.0f; // This is your simulation's fps
 
     // Calculate deltaTime assuming each frame is 1/fps seconds long
@@ -95,13 +94,10 @@ void BulletCollisionHandler::updateWorld(float framesToUpdate) {
 
     int maxSubSteps = 200;
     float fixedTimeStep = 1.f / fps; // This is the time each physics "step" represents at 24fps
-    MGlobal::displayWarning("UPDATE WORLD MID!!!");
     this->dynamicsWorld->getSolverInfo().m_numIterations = 30; // Example value
-    MGlobal::displayWarning("UPDATE WORLD MID2222!!!");
 
     // Update the dynamics world by the deltaTime
     this->dynamicsWorld->stepSimulation(deltaTime, maxSubSteps, fixedTimeStep);
-    MGlobal::displayWarning("UPDATE WORLD OUT!!!");
 }
 
 void BulletCollisionHandler::updateActiveObject(MFnMesh* mesh)
@@ -158,50 +154,85 @@ void BulletCollisionHandler::cleanRigidBody(btRigidBody* body) {
         return;
     }
 
-    MGlobal::displayWarning("cleanRigidBody0");
     // Remove it from the world
     this->dynamicsWorld->removeRigidBody(body);
-    MGlobal::displayWarning("cleanRigidBody1");
 
     // Delete the motion state and the rigid body to avoid memory leaks
     delete body->getMotionState();
-    MGlobal::displayWarning("cleanRigidBody2");
     delete body;
-    MGlobal::displayWarning("cleanRigidBody3");
     body = nullptr; // Ensure the pointer is reset to nullptr after deletion
-    MGlobal::displayWarning("cleanRigidBody4");
 }
 
-void BulletCollisionHandler::updateColliders(std::vector<MFnMesh*> collidersMFnMeshes, MFnMesh* excludeMesh)
-{
-    if (!this->colliders.empty()) {
-        // Remove all existing colliders from the world and delete them
-        for (auto& collider : this->colliders) {
-            if (collider) {
-                this->dynamicsWorld->removeCollisionObject(collider);
-                delete collider->getCollisionShape();
-                btRigidBody* body = btRigidBody::upcast(collider);
-                if (body && body->getMotionState()) {
-                    delete body->getMotionState();
-                }
-                delete collider;
-            }
-        }
-        this->colliders.clear();
-    }
+void BulletCollisionHandler::updateColliders(std::vector<MFnMesh*> collidersMFnMeshes, MFnMesh* excludeMesh) {
+
+    /*
+    if you already had colliders then update existing ones
+    else
+    create new ones
+    */
+
+    std::vector <std::string> collidersToRemove;
 
     // Add new colliders based on the provided MFnMeshes
     for (auto& mfnMesh : collidersMFnMeshes) {
-        if(excludeMesh!=nullptr && excludeMesh->fullPathName() == mfnMesh->fullPathName()){
+        std::string fullPathName = mfnMesh->fullPathName().asChar();
+
+        bool colliderAlreadyCreated = false;
+        auto it = this->colliders.find(fullPathName);
+        if (it != this->colliders.end()) {
+            colliderAlreadyCreated = true;
+        }
+
+        if (excludeMesh != nullptr && excludeMesh->fullPathName() == mfnMesh->fullPathName()) {
+            if (colliderAlreadyCreated) {
+                collidersToRemove.push_back(fullPathName);
+            }
+            // if excludeMesh inside colliders then remove it from map and world
+            continue;
+        }
+
+        if (colliderAlreadyCreated) {
             continue;
         }
 
         btRigidBody* rigidBody = this->createFullColliderFromMFnMesh(mfnMesh);
         this->dynamicsWorld->addRigidBody(rigidBody, btBroadphaseProxy::StaticFilter, btBroadphaseProxy::AllFilter);
-        this->colliders.push_back(rigidBody);
+        this->colliders[fullPathName] = rigidBody;
+    }
+
+    if (!collidersToRemove.empty()) {
+        for (const std::string & colliderName : collidersToRemove) {
+            MGlobal::displayWarning("removing collider: " + MString(colliderName.c_str()));
+            btRigidBody* bodyToRemove = this->colliders[colliderName];
+            this->deleteCollider(bodyToRemove);
+
+            colliders.erase(colliderName);
+        }
+
     }
     MGlobal::displayInfo("Colliders were updated!");
 }
+
+void BulletCollisionHandler::clearColliders() {
+    // Remove all existing colliders from the world and delete them
+    for (auto& pair : this->colliders) {
+        btRigidBody* collider = pair.second;
+        if (collider) {
+            this->deleteCollider(collider);
+        }
+    }
+    this->colliders.clear();
+}
+
+void BulletCollisionHandler::deleteCollider(btRigidBody* collider) {
+    this->dynamicsWorld->removeCollisionObject(collider);
+    delete collider->getCollisionShape();
+    if (collider->getMotionState()) {
+        delete collider->getMotionState();
+    }
+    delete collider;
+}
+
 
 btRigidBody* BulletCollisionHandler::createFullColliderFromMFnMesh(MFnMesh* mfnMesh) {
     btCollisionShape* newShape = this->convertMFnMeshToStaticCollisionShape(mfnMesh);
@@ -222,6 +253,7 @@ btRigidBody* BulletCollisionHandler::createFullColliderFromMFnMesh(MFnMesh* mfnM
     rigidBody->setRollingFriction(0.1);
     rigidBody->setSpinningFriction(0.1);
     rigidBody->setDamping(0.1, 0.1);
+
     return rigidBody;
 }
 
@@ -400,3 +432,4 @@ MMatrix BulletCollisionHandler::convertBulletToMayaMatrix(const btTransform& bul
 
     return mayaMatrix;
 }
+

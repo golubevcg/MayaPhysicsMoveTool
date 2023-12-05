@@ -71,8 +71,8 @@ void CustomMoveManip::updateManipLocations(const MObject& node)
     MTransformationMatrix::RotationOrder rOrder;
     originalTM.getRotation(rot, rOrder);
 
-    manipFn.setRotation(rot, rOrder);
-    manipFn.setTranslation(originalTM.getTranslation(MSpace::kTransform), MSpace::kTransform);
+    //manipFn.setRotation(rot, rOrder);
+    manipFn.setTranslation(originalTM.getTranslation(MSpace::kWorld), MSpace::kWorld);
 
     MStatus status;
 }
@@ -83,13 +83,9 @@ MStatus CustomMoveManip::doPress() {
 }
 
 MStatus CustomMoveManip::doDrag() {
-    MGlobal::displayWarning("doDrag_11111");
     // Update the world.
 
     this->bulletCollisionHandler.updateWorld(5.0);
-    MGlobal::displayWarning("doDrag_3333");
-
-    MGlobal::displayWarning("doDrag_1");
 
     // Read translation from manip.
     MFnManip3D manipFn(this->fFreePointManipDagPath);
@@ -98,7 +94,6 @@ MStatus CustomMoveManip::doDrag() {
     this->getConverterManipValue(0, currentPosition);
     MPoint currentTranslation = manipFn.translation(MSpace::kWorld);
 
-    MGlobal::displayWarning("doDrag_2");
     // Get the current position of the rigid body
     btVector3 currentPos = this->bulletCollisionHandler.activeRigidBody->getWorldTransform().getOrigin();
     // Calculate target position (convert to Bullet's coordinate system)
@@ -111,7 +106,6 @@ MStatus CustomMoveManip::doDrag() {
 
     // Calculate the required velocity to reach the target position in one time step
     btVector3 requiredVelocity = (targetPos - currentPos) / timeStep;
-    MGlobal::displayWarning("doDrag_3");
 
     // Apply this velocity to the rigid body
     this->bulletCollisionHandler.activeRigidBody->setLinearVelocity(requiredVelocity*0.01);
@@ -120,9 +114,7 @@ MStatus CustomMoveManip::doDrag() {
     // Read transform from active object.
     MMatrix activeObjectUpdatedMatrix = this->bulletCollisionHandler.getActiveObjectTransformMMatrix();
     this->applyTransformToActiveObjectTransform(activeObjectUpdatedMatrix);
-    MGlobal::displayWarning("doDrag_4");
-    /*
-    */
+    
     return MS::kUnknownParameter;
 }
 

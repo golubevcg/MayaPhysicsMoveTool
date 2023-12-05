@@ -47,11 +47,16 @@ void CustomMoveManipContext::selectionChanged(void* data) {
 
     CollisionCandidatesFinder& collisionCandidatesFinder = CollisionCandidatesFinder::getInstance();
     collisionCandidatesFinder.addActiveObject();
-    collisionCandidatesFinder.getSceneMFnMeshes();
+    // update this
+    if (collisionCandidatesFinder.allSceneMFnMeshes.empty()) {
+        collisionCandidatesFinder.getSceneMFnMeshes();
+    }
 
     BulletCollisionHandler& bulletCollisionHandler = BulletCollisionHandler::getInstance();
     bulletCollisionHandler.createDynamicsWorld();
     bulletCollisionHandler.updateActiveObject(collisionCandidatesFinder.activeMFnMesh);
+
+    // update this
     bulletCollisionHandler.updateColliders(collisionCandidatesFinder.allSceneMFnMeshes, collisionCandidatesFinder.activeMFnMesh);
 
     for (; !iter.isDone(); iter.next()) {
@@ -64,7 +69,6 @@ void CustomMoveManipContext::selectionChanged(void* data) {
             continue;
         }
         MFnDependencyNode dependNodeFn(dependNode);
-        MGlobal::displayWarning("------------------------------ITERATOR" + MString() + dependNodeFn.absoluteName());
 
         MPlug tPlug = dependNodeFn.findPlug("translate", true, &stat);
         if (tPlug.isNull()) {

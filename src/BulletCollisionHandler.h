@@ -5,6 +5,7 @@
 #define BULLET_COLLISION_HANDLER_H
 
 #include <vector>
+#include <unordered_map>
 #include "btBulletDynamicsCommon.h"
 
 class BulletCollisionHandler 
@@ -21,10 +22,13 @@ class BulletCollisionHandler
 
         void cleanRigidBody(btRigidBody* body);
         void updateActiveObject(MFnMesh* mesh);
-        void updateColliders(std::vector<MFnMesh*> collidersMFnMeshes, MFnMesh* exclude = nullptr);
+        void updateColliders(std::vector<MFnMesh*> collidersMFnMeshes, MFnMesh* excludeMesh);
+
+        void clearColliders();
+        void deleteCollider(btRigidBody* collider);
+
         btRigidBody* createFullColliderFromMFnMesh(MFnMesh* mfnMesh);
         btRigidBody* createFullActiveRigidBodyFromMFnMesh(MFnMesh* mfnMesh);
-
 
         MMatrix getActiveObjectTransformMMatrix();
         bool isRigidBodyInWorld(btRigidBody* body);
@@ -41,7 +45,7 @@ class BulletCollisionHandler
 
         btRigidBody* activeRigidBody;
         btRigidBody* proxyRigidBody;
-        std::vector<btRigidBody*> colliders;
+        std::unordered_map<std::string, btRigidBody*> colliders;
         btDiscreteDynamicsWorld* dynamicsWorld;
 
     private:
