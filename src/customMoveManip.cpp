@@ -6,31 +6,6 @@ MTypeId CustomMoveManip::id(0x8001d);
 CustomMoveManip::CustomMoveManip():
         bulletCollisionHandler(BulletCollisionHandler::getInstance()),
         collisionCandidatesFinder(CollisionCandidatesFinder::getInstance()) {
-    this->collisionCandidatesFinder.addActiveObject();
-    this->collisionCandidatesFinder.getSceneMFnMeshes();
-    this->bulletCollisionHandler.createDynamicsWorld();
-
-    this->bulletCollisionHandler.updateActiveObject(this->collisionCandidatesFinder.activeMFnMesh);
-    this->bulletCollisionHandler.updateColliders(
-        this->collisionCandidatesFinder.allSceneMFnMeshes, 
-        this->collisionCandidatesFinder.activeMFnMesh
-    );
-
-    /*
-    this->bulletCollisionHandler.createDynamicsWorld();
-    this->collisionCandidatesFinder.addActiveObject();
-    MGlobal::displayInfo("Amount of scene MFnMeshes:" + MString() + this->collisionCandidatesFinder.allSceneMFnMeshes.size());
-    this->bulletCollisionHandler.updateActiveObject(this->collisionCandidatesFinder.activeMFnMesh);
-
-    if (this->collisionCandidatesFinder.allSceneMFnMeshes.empty()) {
-        this->collisionCandidatesFinder.getSceneMFnMeshes();
-    }
-
-    this->bulletCollisionHandler.updateColliders(
-        this->collisionCandidatesFinder.allSceneMFnMeshes, 
-        this->collisionCandidatesFinder.activeMFnMesh
-    );
-    */
 }
 
 CustomMoveManip::~CustomMoveManip() {
@@ -108,18 +83,22 @@ MStatus CustomMoveManip::doPress() {
 }
 
 MStatus CustomMoveManip::doDrag() {
-    MGlobal::displayWarning("doDrag_0");
+    MGlobal::displayWarning("doDrag_11111");
     // Update the world.
-    this->bulletCollisionHandler.updateWorld(5);
+
+    this->bulletCollisionHandler.updateWorld(5.0);
+    MGlobal::displayWarning("doDrag_3333");
+
     MGlobal::displayWarning("doDrag_1");
 
     // Read translation from manip.
     MFnManip3D manipFn(this->fFreePointManipDagPath);
     MPoint currentPosition;
+
     this->getConverterManipValue(0, currentPosition);
     MPoint currentTranslation = manipFn.translation(MSpace::kWorld);
-    MGlobal::displayWarning("doDrag_2");
 
+    MGlobal::displayWarning("doDrag_2");
     // Get the current position of the rigid body
     btVector3 currentPos = this->bulletCollisionHandler.activeRigidBody->getWorldTransform().getOrigin();
     // Calculate target position (convert to Bullet's coordinate system)
@@ -129,6 +108,7 @@ MStatus CustomMoveManip::doDrag() {
         -(currentPosition.y + currentTranslation.y)
     );
     float timeStep = 1.0f / 60.0f;
+
     // Calculate the required velocity to reach the target position in one time step
     btVector3 requiredVelocity = (targetPos - currentPos) / timeStep;
     MGlobal::displayWarning("doDrag_3");
@@ -141,7 +121,8 @@ MStatus CustomMoveManip::doDrag() {
     MMatrix activeObjectUpdatedMatrix = this->bulletCollisionHandler.getActiveObjectTransformMMatrix();
     this->applyTransformToActiveObjectTransform(activeObjectUpdatedMatrix);
     MGlobal::displayWarning("doDrag_4");
-
+    /*
+    */
     return MS::kUnknownParameter;
 }
 

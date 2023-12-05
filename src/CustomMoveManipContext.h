@@ -21,6 +21,7 @@ class CustomMoveManipContext : public MPxSelectionContext {
         static void selectionChanged(void* data);
 
     private:
+        std::vector<MObject> selectedObjects;
         MCallbackId id;
 };
 

@@ -14,7 +14,7 @@ CustomMoveManipContext::CustomMoveManipContext() {
 void CustomMoveManipContext::toolOnSetup(MEvent&) {
     MString str("Move the object using the manipulator");
     setHelpString(str);
-    selectionChanged(this);
+    //selectionChanged(this);
     MStatus status;
     this->id = MModelMessage::addCallback(MModelMessage::kActiveListModified, selectionChanged, this, &status);
     if (!status) {
@@ -43,6 +43,16 @@ void CustomMoveManipContext::selectionChanged(void* data) {
     if (MS::kSuccess != stat) {
         return;
     }
+    MGlobal::displayWarning("CONTEXT::SELECTION CHANGED!!!!!");
+
+    CollisionCandidatesFinder& collisionCandidatesFinder = CollisionCandidatesFinder::getInstance();
+    collisionCandidatesFinder.addActiveObject();
+    collisionCandidatesFinder.getSceneMFnMeshes();
+
+    BulletCollisionHandler& bulletCollisionHandler = BulletCollisionHandler::getInstance();
+    bulletCollisionHandler.createDynamicsWorld();
+    bulletCollisionHandler.updateActiveObject(collisionCandidatesFinder.activeMFnMesh);
+    bulletCollisionHandler.updateColliders(collisionCandidatesFinder.allSceneMFnMeshes, collisionCandidatesFinder.activeMFnMesh);
 
     for (; !iter.isDone(); iter.next()) {
         MObject dependNode;
@@ -54,6 +64,8 @@ void CustomMoveManipContext::selectionChanged(void* data) {
             continue;
         }
         MFnDependencyNode dependNodeFn(dependNode);
+        MGlobal::displayWarning("------------------------------ITERATOR" + MString() + dependNodeFn.absoluteName());
+
         MPlug tPlug = dependNodeFn.findPlug("translate", true, &stat);
         if (tPlug.isNull()) {
             MGlobal::displayWarning("Object cannot be manipulated: " +

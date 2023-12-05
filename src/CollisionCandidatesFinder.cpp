@@ -1,5 +1,18 @@
+#include <mutex>
 #include "CollisionCandidatesFinder.h"
 
+
+CollisionCandidatesFinder* CollisionCandidatesFinder::instance = nullptr;
+std::once_flag CollisionCandidatesFinder::initInstanceFlag;
+
+CollisionCandidatesFinder& CollisionCandidatesFinder::getInstance() {
+    std::call_once(initInstanceFlag, &CollisionCandidatesFinder::initSingleton);
+    return *instance;
+}
+
+void CollisionCandidatesFinder::initSingleton() {
+    instance = new CollisionCandidatesFinder();
+}
 
 CollisionCandidatesFinder::CollisionCandidatesFinder() {
 

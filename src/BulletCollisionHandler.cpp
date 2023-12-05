@@ -8,6 +8,18 @@
 #include <btBulletDynamicsCommon.h>
 
 
+BulletCollisionHandler* BulletCollisionHandler::instance = nullptr;
+std::once_flag BulletCollisionHandler::initInstanceFlag;
+
+BulletCollisionHandler& BulletCollisionHandler::getInstance() {
+    std::call_once(initInstanceFlag, &BulletCollisionHandler::initSingleton);
+    return *instance;
+}
+
+void BulletCollisionHandler::initSingleton() {
+    instance = new BulletCollisionHandler();
+}
+
 BulletCollisionHandler::BulletCollisionHandler(): 
     broadphase(nullptr),
     collisionConfiguration(nullptr),
@@ -24,6 +36,8 @@ BulletCollisionHandler::~BulletCollisionHandler() {
 }
 
 void BulletCollisionHandler::createDynamicsWorld() {
+    MGlobal::displayInfo("------createDynamicsWorld");
+
     // Create the dynamics world
     this->broadphase = new btDbvtBroadphase();
     this->collisionConfiguration = new btDefaultCollisionConfiguration();
@@ -73,6 +87,7 @@ void BulletCollisionHandler::deleteDynamicsWorld() {
 }
 
 void BulletCollisionHandler::updateWorld(float framesToUpdate) {
+    MGlobal::displayWarning("UPDATE WORLD!!!");
     float fps = 60.0f; // This is your simulation's fps
 
     // Calculate deltaTime assuming each frame is 1/fps seconds long
@@ -80,10 +95,13 @@ void BulletCollisionHandler::updateWorld(float framesToUpdate) {
 
     int maxSubSteps = 200;
     float fixedTimeStep = 1.f / fps; // This is the time each physics "step" represents at 24fps
+    MGlobal::displayWarning("UPDATE WORLD MID!!!");
     this->dynamicsWorld->getSolverInfo().m_numIterations = 30; // Example value
+    MGlobal::displayWarning("UPDATE WORLD MID2222!!!");
 
     // Update the dynamics world by the deltaTime
     this->dynamicsWorld->stepSimulation(deltaTime, maxSubSteps, fixedTimeStep);
+    MGlobal::displayWarning("UPDATE WORLD OUT!!!");
 }
 
 void BulletCollisionHandler::updateActiveObject(MFnMesh* mesh)
