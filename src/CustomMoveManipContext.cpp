@@ -46,7 +46,7 @@ void CustomMoveManipContext::selectionChanged(void* data) {
     MGlobal::displayWarning("CONTEXT::SELECTION CHANGED!!!!!");
 
     CollisionCandidatesFinder& collisionCandidatesFinder = CollisionCandidatesFinder::getInstance();
-    collisionCandidatesFinder.addActiveObject();
+    collisionCandidatesFinder.addActiveObjects();
     // update this
     if (collisionCandidatesFinder.allSceneMFnMeshes.empty()) {
         collisionCandidatesFinder.getSceneMFnMeshes();

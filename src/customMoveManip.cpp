@@ -1,5 +1,6 @@
 #include <CustomMoveManip.h>
 #include <MayaIncludes.h>
+#include <LinearMath/btScalar.h>
 
 MTypeId CustomMoveManip::id(0x8001d);
 
@@ -102,13 +103,35 @@ MStatus CustomMoveManip::doDrag() {
     );
 
     float timeStep = 1.0f / 60.0f;
-
-    // Calculate the required velocity to reach the target position in one time step
     btVector3 requiredVelocity = (targetPos - currentPos) / timeStep;
 
-    // Apply this velocity to the rigid body
-    this->bulletCollisionHandler.activeRigidBody->setLinearVelocity(requiredVelocity*0.01);
-    this->bulletCollisionHandler.updateWorld(50);
+    requiredVelocity *= 0.01;
+
+    // Define a threshold for negligible values
+    float threshold = 0.01f;
+
+    // Set small values to zero
+    if (std::abs(requiredVelocity.x()) < threshold) requiredVelocity.setX(0);
+    if (std::abs(requiredVelocity.y()) < threshold) requiredVelocity.setY(0);
+    if (std::abs(requiredVelocity.z()) < threshold) requiredVelocity.setZ(0);
+
+    // Define range for clamping
+    float minValue = -0.2f;
+    float maxValue = 0.2f;
+
+    // Clamp values within the range
+    requiredVelocity.setX(std::min(std::max(requiredVelocity.x(), minValue), maxValue));
+    requiredVelocity.setY(std::min(std::max(requiredVelocity.y(), minValue), maxValue));
+    requiredVelocity.setZ(std::min(std::max(requiredVelocity.z(), minValue), maxValue));
+
+    // Print the modified velocity
+    MString msg = "btVector3: (" + MString() + requiredVelocity.x() + ", "
+        + MString() + requiredVelocity.y() + ", "
+        + MString() + requiredVelocity.z() + ")";
+    MGlobal::displayInfo(msg);
+
+    this->bulletCollisionHandler.activeRigidBody->setLinearVelocity(requiredVelocity);
+    this->bulletCollisionHandler.updateWorld(50);;
 
     // Read transform from active object.
     MMatrix activeObjectUpdatedMatrix = this->bulletCollisionHandler.getActiveObjectTransformMMatrix();

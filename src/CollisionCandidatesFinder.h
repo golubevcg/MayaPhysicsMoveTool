@@ -18,13 +18,17 @@ class CollisionCandidatesFinder {
         CollisionCandidatesFinder(const CollisionCandidatesFinder&) = delete;
         CollisionCandidatesFinder& operator=(const CollisionCandidatesFinder&) = delete;
 
-        MStatus addActiveObject();
+        MStatus addActiveObjects();
         MStatus getSceneMFnMeshes();
 
     public:
         MSelectionList selList;
         MFnMesh* activeMFnMesh;
         MFnDagNode activeTransformMFnDagNode;
+        /*
+        std::vector<MFnMesh*> activeMFnMeshes;
+        std::vector<MFnDagNode> activeTransformMFnDagNode;
+        */
         std::vector<MFnMesh*> allSceneMFnMeshes;
 
     private:

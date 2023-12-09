@@ -22,10 +22,9 @@ CollisionCandidatesFinder::~CollisionCandidatesFinder() {
     for (MFnMesh* mesh : this->allSceneMFnMeshes) {
         delete mesh;
     }
-    */
 }
 
-MStatus CollisionCandidatesFinder::addActiveObject() {
+MStatus CollisionCandidatesFinder::addActiveObjects() {
     MGlobal::getActiveSelectionList(this->selList);
     if (this->selList.isEmpty()) {
         MString warningMessage = "No objects selected";

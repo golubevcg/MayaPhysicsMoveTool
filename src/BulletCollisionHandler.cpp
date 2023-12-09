@@ -90,9 +90,9 @@ void BulletCollisionHandler::updateWorld(float framesToUpdate) {
     // Calculate deltaTime assuming each frame is 1/fps seconds long
     float deltaTime = framesToUpdate / fps;
 
-    int maxSubSteps = 200;
+    int maxSubSteps = 100;
     float fixedTimeStep = 1.f / fps; // This is the time each physics "step" represents at 24fps
-    this->dynamicsWorld->getSolverInfo().m_numIterations = 30; // Example value
+    this->dynamicsWorld->getSolverInfo().m_numIterations = 50; // Example value
 
     // Update the dynamics world by the deltaTime
     this->dynamicsWorld->stepSimulation(deltaTime, maxSubSteps, fixedTimeStep);
@@ -234,7 +234,7 @@ void BulletCollisionHandler::deleteCollider(btRigidBody* collider) {
 
 btRigidBody* BulletCollisionHandler::createFullColliderFromMFnMesh(MFnMesh* mfnMesh) {
     btCollisionShape* newShape = this->convertMFnMeshToStaticCollisionShape(mfnMesh);
-    newShape->setMargin(0.05);
+    //newShape->setMargin(0.05);
 
     btTransform bulletTransform = btTransform::getIdentity();
 
@@ -246,11 +246,12 @@ btRigidBody* BulletCollisionHandler::createFullColliderFromMFnMesh(MFnMesh* mfnM
     rigidBody->setCollisionFlags(rigidBody->getCollisionFlags() | btCollisionObject::CF_STATIC_OBJECT);
     rigidBody->setActivationState(DISABLE_DEACTIVATION);
 
-    rigidBody->setRestitution(0.001);
-    rigidBody->setFriction(0.1);
-    rigidBody->setRollingFriction(0.1);
-    rigidBody->setSpinningFriction(0.1);
-    rigidBody->setDamping(0.1, 0.1);
+    rigidBody->setRestitution(0.000);
+    rigidBody->setFriction(0.00);
+    rigidBody->setRollingFriction(0.15);
+    rigidBody->setSpinningFriction(0.15);
+    rigidBody->setDamping(0.25*0.25, 0.25 * 0.25);
+    //rigidBody->setContactStiffnessAndDamping(1e5, 0.1); // Example values
 
     return rigidBody;
 }
@@ -275,13 +276,13 @@ btRigidBody* BulletCollisionHandler::createFullActiveRigidBodyFromMFnMesh(MFnMes
     // Apply scale to the collision shape
     btVector3 bulletScale(scale[0], scale[1], scale[2]);
     collisionShape->setLocalScaling(bulletScale);
-    collisionShape->setMargin(0.05);
+    collisionShape->setMargin(0);
 
     // Convert Maya's transformation matrix to Bullet's btTransform
     btTransform bulletTransform = this->getBulletTransformFromMFnMeshTransform(mfnMesh);
 
     // Define the mass of the rigid body
-    float mass = 1.5;
+    float mass = 10000;
     btVector3 localInertia(0, 0, 0);
     collisionShape->calculateLocalInertia(mass, localInertia);
 
@@ -290,12 +291,11 @@ btRigidBody* BulletCollisionHandler::createFullActiveRigidBodyFromMFnMesh(MFnMes
     btRigidBody::btRigidBodyConstructionInfo rbInfo(mass, motionState, collisionShape, localInertia);
     btRigidBody* rigidBody = new btRigidBody(rbInfo);
 
-    rigidBody->setRestitution(0.001);
-    rigidBody->setFriction(0.15);
+    rigidBody->setRestitution(0.000);
+    rigidBody->setFriction(0.00);
     rigidBody->setRollingFriction(0.15);
     rigidBody->setSpinningFriction(0.15);
-    rigidBody->setDamping(0.15, 0.15);
-    //rigidBody->getContactStiffness();
+    rigidBody->setDamping(0.25 * 2, 0.25 * 2);
 
     rigidBody->setCollisionFlags(rigidBody->getCollisionFlags() | btCollisionObject::CF_DYNAMIC_OBJECT);
     rigidBody->setActivationState(DISABLE_DEACTIVATION);
