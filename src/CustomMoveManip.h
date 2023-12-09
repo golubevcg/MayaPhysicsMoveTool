@@ -17,9 +17,7 @@ public:
     MStatus doDrag() override;
     MStatus doPress() override;
     void applyTransformAndRotateToActiveObjectTransform(MMatrix matrix);
-
-private:
-    void updateManipLocations(const MObject& node);
+    void updateManipLocation(const MVector vector);
 public:
     MDagPath fFreePointManipDagPath;
     static MTypeId id;

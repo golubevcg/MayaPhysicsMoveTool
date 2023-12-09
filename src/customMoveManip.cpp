@@ -44,33 +44,18 @@ MStatus CustomMoveManip::connectToDependNode(const MObject& node) {
     MFnDependencyNode nodeFn(node);
     MPlug tPlug = nodeFn.findPlug("translate", true, &stat);
     MFnFreePointTriadManip freePointManipFn(this->fFreePointManipDagPath);
-    this->updateManipLocations(node);
     this->finishAddingManips();
     MPxManipContainer::connectToDependNode(node);
     return stat;
 }
 
-void CustomMoveManip::updateManipLocations(const MObject& node) {
+void CustomMoveManip::updateManipLocation(const MVector vector) {
 //
 // Description
 //        setTranslation and setRotation to the parent's transformation.
 //
-    MGlobal::displayWarning("---CUSTOMMOVEMANIP updateManipLocations");
     MFnFreePointTriadManip manipFn(this->fFreePointManipDagPath);
-
-    MDagPath dagPath;
-    MFnDagNode(node).getPath(dagPath);
-
-    MObject transformNode = dagPath.transform();
-    MFnTransform fnTransform(transformNode);
-    MTransformationMatrix originalTM = fnTransform.transformation();
-
-    double rot[3];
-    MTransformationMatrix::RotationOrder rOrder;
-    originalTM.getRotation(rot, rOrder);
-
-    //manipFn.setRotation(rot, rOrder);
-    manipFn.setTranslation(originalTM.getTranslation(MSpace::kWorld), MSpace::kWorld);
+    manipFn.setTranslation(vector, MSpace::kWorld);
 
     MStatus status;
 }

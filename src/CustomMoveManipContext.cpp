@@ -59,35 +59,48 @@ void CustomMoveManipContext::selectionChanged(void* data) {
     // update this
     bulletCollisionHandler.updateColliders(collisionCandidatesFinder.allSceneMFnMeshes, collisionCandidatesFinder.activeMFnMesh);
 
+
+    //-------------------------------
+    MVector avgPosition(0.0, 0.0, 0.0);
+    unsigned int count = 0;
+
+    // Iterate over all selected objects and accumulate positions
     for (; !iter.isDone(); iter.next()) {
         MObject dependNode;
         iter.getDependNode(dependNode);
-        if (dependNode.isNull() || !dependNode.hasFn(MFn::kDependencyNode))
-        {
-            MGlobal::displayWarning("Object in selection list is not "
-                "a depend node.");
-            continue;
-        }
-        MFnDependencyNode dependNodeFn(dependNode);
-
-        MPlug tPlug = dependNodeFn.findPlug("translate", true, &stat);
-        if (tPlug.isNull()) {
-            MGlobal::displayWarning("Object cannot be manipulated: " +
-                dependNodeFn.name());
+        if (dependNode.isNull() || !dependNode.hasFn(MFn::kTransform)) {
             continue;
         }
 
-        MString manipName("customMoveManip");
-        MObject manipObject;
-        CustomMoveManip* manipulator = (CustomMoveManip*)CustomMoveManip::newManipulator(manipName, manipObject);
-        if (NULL != manipulator) {
-            ctxPtr->addManipulator(manipObject);
-            // Connect the manipulator to the object in the selection list.
-            if (!manipulator->connectToDependNode(dependNode))
-            {
-                MGlobal::displayWarning("Error connecting manipulator to"
-                    " object: " + dependNodeFn.name());
-            }
-        }
+
+
+        MFnTransform transFn(dependNode);
+        // Get world space transformation matrix
+        MMatrix worldMatrix = transFn.transformationMatrix();
+        MVector trans(worldMatrix[3][0], worldMatrix[3][1], worldMatrix[3][2]);
+
+        MGlobal::displayInfo("transFn.translation: " + MString() + trans.x + " " + MString() + trans.y + " " + MString() + trans.z);
+
+        avgPosition += trans;
+
+        count++;
+    }
+    iter.reset();
+
+    // Calculate the average position
+    if (count > 0) {
+        avgPosition /= count;
+    }
+
+    MGlobal::displayInfo("avgPosition: " + MString() + avgPosition.x + " " + MString() + avgPosition.y + " " + MString() + avgPosition.z);
+
+    // Create a single manipulator at the average position
+    MString manipName("customMoveManip");
+    MObject manipObject;
+    CustomMoveManip* manipulator = (CustomMoveManip*)CustomMoveManip::newManipulator(manipName, manipObject);
+
+    if (manipulator != NULL) {
+        ctxPtr->addManipulator(manipObject);
+        manipulator->updateManipLocation(avgPosition);
     }
 }
