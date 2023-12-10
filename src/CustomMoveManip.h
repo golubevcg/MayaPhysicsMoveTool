@@ -16,7 +16,7 @@ public:
     MStatus connectToDependNode(const MObject&) override;
     MStatus doDrag() override;
     MStatus doPress() override;
-    void applyTransformAndRotateToActiveObjectTransform(MMatrix matrix);
+    void applyTransformAndRotateToActiveObjectTransform(MMatrix matrix, std::string name);
     void updateManipLocation(const MVector vector);
 public:
     MDagPath fFreePointManipDagPath;

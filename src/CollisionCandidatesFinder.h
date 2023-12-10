@@ -8,6 +8,7 @@
 #include <vector>
 #include <stdlib.h>
 #include <MayaIncludes.h>
+#include <unordered_map>
 
 
 class CollisionCandidatesFinder {
@@ -23,12 +24,13 @@ class CollisionCandidatesFinder {
 
     public:
         MSelectionList selList;
-        MFnMesh* activeMFnMesh;
-        MFnDagNode activeTransformMFnDagNode;
         /*
-        std::vector<MFnMesh*> activeMFnMeshes;
-        std::vector<MFnDagNode> activeTransformMFnDagNode;
+        MFnMesh* activeMFnMeshes;
+        MFnDagNode activeTransformMFnDagNodes;
         */
+
+        std::unordered_map<std::string, MFnMesh*> activeMFnMeshes;
+        std::unordered_map<std::string, MFnDagNode*> activeTransformMFnDagNodes;
         std::vector<MFnMesh*> allSceneMFnMeshes;
 
     private:

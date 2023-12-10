@@ -54,13 +54,11 @@ void CustomMoveManipContext::selectionChanged(void* data) {
 
     BulletCollisionHandler& bulletCollisionHandler = BulletCollisionHandler::getInstance();
     bulletCollisionHandler.createDynamicsWorld();
-    bulletCollisionHandler.updateActiveObject(collisionCandidatesFinder.activeMFnMesh);
+    bulletCollisionHandler.updateActiveObjects(collisionCandidatesFinder.activeMFnMeshes);
 
     // update this
-    bulletCollisionHandler.updateColliders(collisionCandidatesFinder.allSceneMFnMeshes, collisionCandidatesFinder.activeMFnMesh);
+    bulletCollisionHandler.updateColliders(collisionCandidatesFinder.allSceneMFnMeshes, collisionCandidatesFinder.activeMFnMeshes);
 
-
-    //-------------------------------
     MVector avgPosition(0.0, 0.0, 0.0);
     unsigned int count = 0;
 
@@ -72,17 +70,10 @@ void CustomMoveManipContext::selectionChanged(void* data) {
             continue;
         }
 
-
-
         MFnTransform transFn(dependNode);
-        // Get world space transformation matrix
         MMatrix worldMatrix = transFn.transformationMatrix();
         MVector trans(worldMatrix[3][0], worldMatrix[3][1], worldMatrix[3][2]);
-
-        MGlobal::displayInfo("transFn.translation: " + MString() + trans.x + " " + MString() + trans.y + " " + MString() + trans.z);
-
         avgPosition += trans;
-
         count++;
     }
     iter.reset();

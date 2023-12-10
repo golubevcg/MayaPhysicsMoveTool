@@ -25,9 +25,7 @@ BulletCollisionHandler::BulletCollisionHandler():
     collisionConfiguration(nullptr),
     dispatcher(nullptr),
     solver(nullptr),
-    dynamicsWorld(nullptr),
-    activeRigidBody(nullptr),
-    proxyRigidBody(nullptr) {
+    dynamicsWorld(nullptr){
     MGlobal::displayInfo("CONSTRUUUCTOOOOOOOOOR");
 }
 
@@ -98,28 +96,35 @@ void BulletCollisionHandler::updateWorld(float framesToUpdate) {
     this->dynamicsWorld->stepSimulation(deltaTime, maxSubSteps, fixedTimeStep);
 }
 
-void BulletCollisionHandler::updateActiveObject(MFnMesh* mesh)
+void BulletCollisionHandler::updateActiveObjects(std::unordered_map<std::string, MFnMesh*> MFnMeshes)
 {
-    this->cleanRigidBody(this->activeRigidBody);
-    this->activeRigidBody = this->createFullActiveRigidBodyFromMFnMesh(mesh);
+    this->cleanRigidBodies(this->activeRigidBodies);
+    for (auto it = MFnMeshes.begin(); it != MFnMeshes.end(); ++it) {
+        std::string key = it->first;
+        MFnMesh* mesh = it->second;
+        if (this->activeRigidBodies.find(key) != this->activeRigidBodies.end()) {
+            return;
+        }
+        this->activeRigidBodies[key] = this->createFullActiveRigidBodyFromMFnMesh(mesh);
+    }
 }
 
-MMatrix BulletCollisionHandler::getActiveObjectTransformMMatrix() {
-    if (this->activeRigidBody) {
-        btTransform btTrans;
-        btMotionState* motionState = this->activeRigidBody->getMotionState();
-        if (motionState) {
-            motionState->getWorldTransform(btTrans);
-        }
-        else {
-            btTrans = this->activeRigidBody->getWorldTransform();
-        }
-
-        return this->convertBulletToMayaMatrix(btTrans);
+MMatrix BulletCollisionHandler::getActiveObjectTransformMMatrix(std::string meshName) {
+    if (this->activeRigidBodies.empty() || this->activeRigidBodies.find(meshName) != this->activeRigidBodies.end()) {
+        return MMatrix::identity;
     }
 
-    // If the proxy object does not exist, return an identity matrix
-    return MMatrix::identity;
+    btTransform btTrans;
+    btRigidBody* activeRigidBody = this->activeRigidBodies[meshName];
+    btMotionState* motionState = activeRigidBody->getMotionState();
+    if (motionState) {
+        motionState->getWorldTransform(btTrans);
+    }
+    else {
+        btTrans = activeRigidBody->getWorldTransform();
+    }
+
+    return this->convertBulletToMayaMatrix(btTrans);
 }
 
 bool BulletCollisionHandler::isRigidBodyInWorld(btRigidBody* body) {
@@ -139,8 +144,8 @@ bool BulletCollisionHandler::isRigidBodyInWorld(btRigidBody* body) {
 }
 
 
-void BulletCollisionHandler::cleanRigidBody(btRigidBody* body) {
-    if (!body) {
+void BulletCollisionHandler::cleanRigidBodies(std::unordered_map<std::string, btRigidBody*> rigidBodies) {
+    if (rigidBodies.empty()) {
         return;
     }
 
@@ -148,20 +153,21 @@ void BulletCollisionHandler::cleanRigidBody(btRigidBody* body) {
         return;
     }
 
-    if (!this->isRigidBodyInWorld(body)) {
-        return;
+    for (auto& pair : rigidBodies) {
+        btRigidBody* body = pair.second;
+        if (!this->isRigidBodyInWorld(body)) {
+            return;
+        }
+
+        // Remove it from the world
+        this->dynamicsWorld->removeRigidBody(body);
+        delete body->getMotionState();
+        delete body;
+        body = nullptr;
     }
-
-    // Remove it from the world
-    this->dynamicsWorld->removeRigidBody(body);
-
-    // Delete the motion state and the rigid body to avoid memory leaks
-    delete body->getMotionState();
-    delete body;
-    body = nullptr; // Ensure the pointer is reset to nullptr after deletion
 }
 
-void BulletCollisionHandler::updateColliders(std::vector<MFnMesh*> collidersMFnMeshes, MFnMesh* excludeMesh) {
+void BulletCollisionHandler::updateColliders(std::vector<MFnMesh*> collidersMFnMeshes, std::unordered_map<std::string, MFnMesh*> excludeMeshes) {
 
     /*
     if you already had colliders then update existing ones
@@ -176,12 +182,11 @@ void BulletCollisionHandler::updateColliders(std::vector<MFnMesh*> collidersMFnM
         std::string fullPathName = mfnMesh->fullPathName().asChar();
 
         bool colliderAlreadyCreated = false;
-        auto it = this->colliders.find(fullPathName);
-        if (it != this->colliders.end()) {
+        if (this->colliders.find(fullPathName) != this->colliders.end()) {
             colliderAlreadyCreated = true;
         }
 
-        if (excludeMesh != nullptr && excludeMesh->fullPathName() == mfnMesh->fullPathName()) {
+        if (!excludeMeshes.empty() && excludeMeshes.find(mfnMesh->fullPathName().asChar()) != excludeMeshes.end()) {
             if (colliderAlreadyCreated) {
                 collidersToRemove.push_back(fullPathName);
             }

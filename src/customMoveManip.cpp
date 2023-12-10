@@ -69,7 +69,6 @@ MStatus CustomMoveManip::doDrag() {
     MGlobal::displayWarning("---CUSTOMMOVEMANIP doDrag");
 
     // Update the world.
-
     this->bulletCollisionHandler.updateWorld(5.0);
 
     // Read translation from manip.
@@ -79,58 +78,68 @@ MStatus CustomMoveManip::doDrag() {
     this->getConverterManipValue(0, currentPosition);
     MPoint currentTranslation = manipFn.translation(MSpace::kWorld);
 
-    // Get the current position of the rigid body
-    btVector3 currentPos = this->bulletCollisionHandler.activeRigidBody->getWorldTransform().getOrigin();
-    btVector3 targetPos(
-        currentPosition.x + currentTranslation.x,
-        currentPosition.z + currentTranslation.z,
-        -(currentPosition.y + currentTranslation.y)
-    );
+    for (auto& pair : this->bulletCollisionHandler.activeRigidBodies) {
+        std::string name = pair.first;
+        btRigidBody* body = pair.second;
 
-    float timeStep = 1.0f / 60.0f;
-    btVector3 requiredVelocity = (targetPos - currentPos) / timeStep;
+        // MOVE THIS PART OUT OF FOR CYCLE
+        // Get the current position of the rigid body
+        btVector3 currentPos = body->getWorldTransform().getOrigin();
+        btVector3 targetPos(
+            currentPosition.x + currentTranslation.x,
+            currentPosition.z + currentTranslation.z,
+            -(currentPosition.y + currentTranslation.y)
+        );
 
-    requiredVelocity *= 0.01;
+        float timeStep = 1.0f / 60.0f;
+        btVector3 requiredVelocity = (targetPos - currentPos) / timeStep;
 
-    // Define a threshold for negligible values
-    float threshold = 0.01f;
+        requiredVelocity *= 0.01;
 
-    // Set small values to zero
-    if (std::abs(requiredVelocity.x()) < threshold) requiredVelocity.setX(0);
-    if (std::abs(requiredVelocity.y()) < threshold) requiredVelocity.setY(0);
-    if (std::abs(requiredVelocity.z()) < threshold) requiredVelocity.setZ(0);
+        // Define a threshold for negligible values
+        float threshold = 0.01f;
 
-    // Define range for clamping
-    float minValue = -0.2f;
-    float maxValue = 0.2f;
+        // Set small values to zero
+        if (std::abs(requiredVelocity.x()) < threshold) requiredVelocity.setX(0);
+        if (std::abs(requiredVelocity.y()) < threshold) requiredVelocity.setY(0);
+        if (std::abs(requiredVelocity.z()) < threshold) requiredVelocity.setZ(0);
 
-    // Clamp values within the range
-    requiredVelocity.setX(std::min(std::max(requiredVelocity.x(), minValue), maxValue));
-    requiredVelocity.setY(std::min(std::max(requiredVelocity.y(), minValue), maxValue));
-    requiredVelocity.setZ(std::min(std::max(requiredVelocity.z(), minValue), maxValue));
+        // Define range for clamping
+        float minValue = -0.2f;
+        float maxValue = 0.2f;
 
-    // Print the modified velocity
-    MString msg = "btVector3: (" + MString() + requiredVelocity.x() + ", "
-        + MString() + requiredVelocity.y() + ", "
-        + MString() + requiredVelocity.z() + ")";
-    MGlobal::displayInfo(msg);
+        // Clamp values within the range
+        requiredVelocity.setX(std::min(std::max(requiredVelocity.x(), minValue), maxValue));
+        requiredVelocity.setY(std::min(std::max(requiredVelocity.y(), minValue), maxValue));
+        requiredVelocity.setZ(std::min(std::max(requiredVelocity.z(), minValue), maxValue));
 
-    this->bulletCollisionHandler.activeRigidBody->setLinearVelocity(requiredVelocity);
-    this->bulletCollisionHandler.updateWorld(50);;
+        // Print the modified velocity
+        MString msg = "btVector3: (" + MString() + requiredVelocity.x() + ", "
+            + MString() + requiredVelocity.y() + ", "
+            + MString() + requiredVelocity.z() + ")";
+        MGlobal::displayInfo(msg);
+        // MOVE THIS PART OUT OF FOR CYCLE
 
-    // Read transform from active object.
-    MMatrix activeObjectUpdatedMatrix = this->bulletCollisionHandler.getActiveObjectTransformMMatrix();
-    this->applyTransformAndRotateToActiveObjectTransform(activeObjectUpdatedMatrix);
-    
-    return MS::kUnknownParameter;
+        body->setLinearVelocity(requiredVelocity);
+        this->bulletCollisionHandler.updateWorld(50);
+
+        // Read transform from active object.
+        MMatrix activeObjectUpdatedMatrix = this->bulletCollisionHandler.getActiveObjectTransformMMatrix(name);
+        this->applyTransformAndRotateToActiveObjectTransform(activeObjectUpdatedMatrix, name);
+
+        return MS::kUnknownParameter;
+    }
 }
 
 
-void CustomMoveManip::applyTransformAndRotateToActiveObjectTransform(MMatrix matrix) {
-    MFnDagNode& activeDagNode = this->collisionCandidatesFinder.activeTransformMFnDagNode;
+void CustomMoveManip::applyTransformAndRotateToActiveObjectTransform(MMatrix matrix, std::string name) {
+    if (this->collisionCandidatesFinder.activeTransformMFnDagNodes.find(name) != this->collisionCandidatesFinder.activeTransformMFnDagNodes.end()) {
+        return;
+    }
 
     MDagPath dagPath;
-    activeDagNode.getPath(dagPath);
+    MFnDagNode* activeDagNode = this->collisionCandidatesFinder.activeTransformMFnDagNodes[name];
+    activeDagNode->getPath(dagPath);
 
     MFnTransform activeTransform(dagPath);
 

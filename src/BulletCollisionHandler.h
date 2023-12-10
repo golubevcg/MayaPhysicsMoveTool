@@ -20,9 +20,9 @@ class BulletCollisionHandler
         void createDynamicsWorld();
         void deleteDynamicsWorld();
 
-        void cleanRigidBody(btRigidBody* body);
-        void updateActiveObject(MFnMesh* mesh);
-        void updateColliders(std::vector<MFnMesh*> collidersMFnMeshes, MFnMesh* excludeMesh);
+        void cleanRigidBodies(std::unordered_map<std::string, btRigidBody*> rigidBodies);
+        void updateActiveObjects(std::unordered_map<std::string, MFnMesh*> MFnMeshes);
+        void updateColliders(std::vector<MFnMesh*> collidersMFnMeshes, std::unordered_map<std::string, MFnMesh*> excludeMeshes);
 
         void clearColliders();
         void deleteCollider(btRigidBody* collider);
@@ -30,7 +30,7 @@ class BulletCollisionHandler
         btRigidBody* createFullColliderFromMFnMesh(MFnMesh* mfnMesh);
         btRigidBody* createFullActiveRigidBodyFromMFnMesh(MFnMesh* mfnMesh);
 
-        MMatrix getActiveObjectTransformMMatrix();
+        MMatrix getActiveObjectTransformMMatrix(std::string meshName);
         bool isRigidBodyInWorld(btRigidBody* body);
 
         btCollisionShape* convertMFnMeshToActiveCollisionShape(MFnMesh* mfnMesh);
@@ -43,8 +43,7 @@ class BulletCollisionHandler
 
         void updateWorld(float framesToUpdate);
 
-        btRigidBody* activeRigidBody;
-        btRigidBody* proxyRigidBody;
+        std::unordered_map<std::string, btRigidBody*> activeRigidBodies;
         std::unordered_map<std::string, btRigidBody*> colliders;
         btDiscreteDynamicsWorld* dynamicsWorld;
 

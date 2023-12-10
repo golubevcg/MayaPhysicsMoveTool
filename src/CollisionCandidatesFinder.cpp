@@ -36,10 +36,11 @@ MStatus CollisionCandidatesFinder::addActiveObjects() {
     this->selList.getDependNode(0, node);  // Get the first selected node
     if (node.hasFn(MFn::kTransform)) {
         bool meshFound = false;
-        this->activeTransformMFnDagNode.setObject(node);
+        MFnDagNode dagNode;
+        dagNode.setObject(node);
 
-        for (unsigned int i = 0; i < this->activeTransformMFnDagNode.childCount(); ++i) {
-            MObject child = this->activeTransformMFnDagNode.child(i);
+        for (unsigned int i = 0; i < dagNode.childCount(); ++i) {
+            MObject child = dagNode.child(i);
             if (!child.hasFn(MFn::kMesh)) {
                 continue;
             }
@@ -48,8 +49,12 @@ MStatus CollisionCandidatesFinder::addActiveObjects() {
             MString infoMessage = "Active mesh object was found: " + mesh.name();
             MGlobal::displayInfo(infoMessage);
 
-            this->activeMFnMesh = new MFnMesh(child);
+            std::string fullName = mesh.fullPathName().asChar();
+            this->activeMFnMeshes[fullName] = new MFnMesh(child);
             meshFound = true;
+            
+            this->activeTransformMFnDagNodes[fullName] = dagNode;
+            
             break;
         }
 
