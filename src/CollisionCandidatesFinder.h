@@ -30,7 +30,7 @@ class CollisionCandidatesFinder {
         */
 
         std::unordered_map<std::string, MFnMesh*> activeMFnMeshes;
-        std::unordered_map<std::string, MFnDagNode*> activeTransformMFnDagNodes;
+        std::unordered_map<std::string, MObject> activeTransformMFnDagNodes;
         std::vector<MFnMesh*> allSceneMFnMeshes;
 
     private:

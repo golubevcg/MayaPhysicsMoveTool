@@ -110,7 +110,8 @@ void BulletCollisionHandler::updateActiveObjects(std::unordered_map<std::string,
 }
 
 MMatrix BulletCollisionHandler::getActiveObjectTransformMMatrix(std::string meshName) {
-    if (this->activeRigidBodies.empty() || this->activeRigidBodies.find(meshName) != this->activeRigidBodies.end()) {
+    if (this->activeRigidBodies.empty() || this->activeRigidBodies.find(meshName) == this->activeRigidBodies.end()) {
+        MGlobal::displayInfo("CANNOT RETURN CORRECT MATRIX");
         return MMatrix::identity;
     }
 

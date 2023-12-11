@@ -14,7 +14,7 @@ void CollisionCandidatesFinder::initSingleton() {
     instance = new CollisionCandidatesFinder();
 }
 
-CollisionCandidatesFinder::CollisionCandidatesFinder() {
+CollisionCandidatesFinder::CollisionCandidatesFinder(){
 
 }
 
@@ -32,43 +32,54 @@ MStatus CollisionCandidatesFinder::addActiveObjects() {
         return MS::kFailure;
     }
 
-    MObject node;
-    this->selList.getDependNode(0, node);  // Get the first selected node
-    if (node.hasFn(MFn::kTransform)) {
-        bool meshFound = false;
-        MFnDagNode dagNode;
-        dagNode.setObject(node);
+    this->activeMFnMeshes.clear();
+    this->activeTransformMFnDagNodes.clear();
 
-        for (unsigned int i = 0; i < dagNode.childCount(); ++i) {
-            MObject child = dagNode.child(i);
-            if (!child.hasFn(MFn::kMesh)) {
-                continue;
+    MStatus stat = MStatus::kSuccess;
+    MSelectionList list;
+    stat = MGlobal::getActiveSelectionList(list);
+    MItSelectionList iter(list, MFn::kInvalid, &stat);
+    for (; !iter.isDone(); iter.next()) {
+        MObject dependNode;
+        iter.getDependNode(dependNode);
+        if (dependNode.hasFn(MFn::kTransform)) {
+            bool meshFound = false;
+            MFnDagNode dagNode;
+            dagNode.setObject(dependNode);
+
+            for (unsigned int i = 0; i < dagNode.childCount(); ++i) {
+                MObject child = dagNode.child(i);
+                if (!child.hasFn(MFn::kMesh)) {
+                    continue;
+                }
+
+                MFnMesh mesh(child);
+                MString infoMessage = "Active mesh object was found: " + mesh.name();
+                MGlobal::displayInfo(infoMessage);
+
+                std::string fullName = mesh.fullPathName().asChar();
+                this->activeMFnMeshes[fullName] = new MFnMesh(child);
+                meshFound = true;
+
+                this->activeTransformMFnDagNodes[fullName] = dependNode;
+
+                break;
             }
 
-            MFnMesh mesh(child);
-            MString infoMessage = "Active mesh object was found: " + mesh.name();
-            MGlobal::displayInfo(infoMessage);
-
-            std::string fullName = mesh.fullPathName().asChar();
-            this->activeMFnMeshes[fullName] = new MFnMesh(child);
-            meshFound = true;
-            
-            this->activeTransformMFnDagNodes[fullName] = dagNode;
-            
-            break;
+            if (!meshFound) {
+                MString warningMessage = "No mesh found for the selected transform";
+                MGlobal::displayWarning(warningMessage);
+                return MS::kFailure;
+            }
         }
-
-        if (!meshFound) {
-            MString warningMessage = "No mesh found for the selected transform";
+        else {
+            MString warningMessage = "Selected object is not a transform";
             MGlobal::displayWarning(warningMessage);
             return MS::kFailure;
         }
     }
-    else {
-        MString warningMessage = "Selected object is not a transform";
-        MGlobal::displayWarning(warningMessage);
-        return MS::kFailure;
-    }
+    iter.reset();
+
 
     return MS::kSuccess;
 }

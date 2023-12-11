@@ -23,6 +23,7 @@ public:
     static MTypeId id;
     CollisionCandidatesFinder& collisionCandidatesFinder;
     BulletCollisionHandler& bulletCollisionHandler;
+    MPoint currentManipPosition;
 };
 
 

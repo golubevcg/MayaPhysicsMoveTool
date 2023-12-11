@@ -56,6 +56,7 @@ void CustomMoveManip::updateManipLocation(const MVector vector) {
 //
     MFnFreePointTriadManip manipFn(this->fFreePointManipDagPath);
     manipFn.setTranslation(vector, MSpace::kWorld);
+    this->currentManipPosition = vector;
 
     MStatus status;
 }
@@ -72,6 +73,7 @@ MStatus CustomMoveManip::doDrag() {
     this->bulletCollisionHandler.updateWorld(5.0);
 
     // Read translation from manip.
+
     MFnManip3D manipFn(this->fFreePointManipDagPath);
     MPoint currentPosition;
 
@@ -133,15 +135,24 @@ MStatus CustomMoveManip::doDrag() {
 
 
 void CustomMoveManip::applyTransformAndRotateToActiveObjectTransform(MMatrix matrix, std::string name) {
-    if (this->collisionCandidatesFinder.activeTransformMFnDagNodes.find(name) != this->collisionCandidatesFinder.activeTransformMFnDagNodes.end()) {
+    MGlobal::displayInfo("NAME:" + MString() + name.c_str());
+
+    
+    if (this->collisionCandidatesFinder.activeTransformMFnDagNodes.find(name) == this->collisionCandidatesFinder.activeTransformMFnDagNodes.end()) {
+        MGlobal::displayInfo("RETURN!!!!!!");
         return;
     }
 
-    MDagPath dagPath;
-    MFnDagNode* activeDagNode = this->collisionCandidatesFinder.activeTransformMFnDagNodes[name];
-    activeDagNode->getPath(dagPath);
+    
+    MObject mobj = this->collisionCandidatesFinder.activeTransformMFnDagNodes[name];
+    MFnDagNode activeDagNode;
+    activeDagNode.setObject(mobj);
 
+    MDagPath dagPath;
+    activeDagNode.getPath(dagPath);
     MFnTransform activeTransform(dagPath);
+    MGlobal::displayInfo("dagNodePath:" + MString() + activeDagNode.fullPathName());
+    MGlobal::displayInfo("dagPathPath:" + MString() + dagPath.fullPathName());
 
     // Create an MTransformationMatrix from the input MMatrix
     MTransformationMatrix transMatrix(matrix);
