@@ -66,7 +66,7 @@ void CustomMoveManipContext::selectionChanged(void* data) {
     for (; !iter.isDone(); iter.next()) {
         MObject dependNode;
         iter.getDependNode(dependNode);
-        if (dependNode.isNull() || !dependNode.hasFn(MFn::kTransform)) {
+        if (dependNode.isNull() || !dependNode.hasFn(MFn::kWorld)) {
             continue;
         }
 

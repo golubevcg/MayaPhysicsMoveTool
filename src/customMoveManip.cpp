@@ -80,47 +80,52 @@ MStatus CustomMoveManip::doDrag() {
     this->getConverterManipValue(0, currentPosition);
     MPoint currentTranslation = manipFn.translation(MSpace::kWorld);
 
+    MGlobal::displayInfo("currentTrnalsation" + MString() + " " + currentTranslation.x + " " + currentTranslation.y + " " + currentTranslation.z);
+    MGlobal::displayInfo("this->currentManipPosition" + MString() + " " + this->currentManipPosition.x + " " + this->currentManipPosition.y + " " + this->currentManipPosition.z);
+
+    //btVector3 currentPos = body->getWorldTransform().getOrigin();
+    btVector3 currentPos(
+        this->currentManipPosition.x,
+        this->currentManipPosition.z,
+        -(this->currentManipPosition.y)
+    );
+
+
+    btVector3 targetPos(
+        currentTranslation.x,
+        currentTranslation.z,
+        -currentTranslation.y
+    );
+
+    float timeStep = 1.0f / 60.0f;
+    btVector3 requiredVelocity = (targetPos - currentPos) / timeStep;
+
+    requiredVelocity *= 0.01;
+
+    // Define a threshold for negligible values
+    float threshold = 0.01f;
+
+    // Set small values to zero
+    if (std::abs(requiredVelocity.x()) < threshold) requiredVelocity.setX(0);
+    if (std::abs(requiredVelocity.y()) < threshold) requiredVelocity.setY(0);
+    if (std::abs(requiredVelocity.z()) < threshold) requiredVelocity.setZ(0);
+
+    // Define range for clamping
+    float minValue = -0.25f;
+    float maxValue = 0.25f;
+
+    // Clamp values within the range
+    requiredVelocity.setX(std::min(std::max(requiredVelocity.x(), minValue), maxValue));
+    requiredVelocity.setY(std::min(std::max(requiredVelocity.y(), minValue), maxValue));
+    requiredVelocity.setZ(std::min(std::max(requiredVelocity.z(), minValue), maxValue));
+
+    // Print the modified velocity
+    MString msg = "btVector3: (" + MString() + requiredVelocity.x() + ", " + MString() + requiredVelocity.y() + ", " + MString() + requiredVelocity.z() + ")";
+    MGlobal::displayInfo(msg);
+
     for (auto& pair : this->bulletCollisionHandler.activeRigidBodies) {
         std::string name = pair.first;
         btRigidBody* body = pair.second;
-
-        // MOVE THIS PART OUT OF FOR CYCLE
-        // Get the current position of the rigid body
-        btVector3 currentPos = body->getWorldTransform().getOrigin();
-        btVector3 targetPos(
-            currentPosition.x + currentTranslation.x,
-            currentPosition.z + currentTranslation.z,
-            -(currentPosition.y + currentTranslation.y)
-        );
-
-        float timeStep = 1.0f / 60.0f;
-        btVector3 requiredVelocity = (targetPos - currentPos) / timeStep;
-
-        requiredVelocity *= 0.01;
-
-        // Define a threshold for negligible values
-        float threshold = 0.01f;
-
-        // Set small values to zero
-        if (std::abs(requiredVelocity.x()) < threshold) requiredVelocity.setX(0);
-        if (std::abs(requiredVelocity.y()) < threshold) requiredVelocity.setY(0);
-        if (std::abs(requiredVelocity.z()) < threshold) requiredVelocity.setZ(0);
-
-        // Define range for clamping
-        float minValue = -0.2f;
-        float maxValue = 0.2f;
-
-        // Clamp values within the range
-        requiredVelocity.setX(std::min(std::max(requiredVelocity.x(), minValue), maxValue));
-        requiredVelocity.setY(std::min(std::max(requiredVelocity.y(), minValue), maxValue));
-        requiredVelocity.setZ(std::min(std::max(requiredVelocity.z(), minValue), maxValue));
-
-        // Print the modified velocity
-        MString msg = "btVector3: (" + MString() + requiredVelocity.x() + ", "
-            + MString() + requiredVelocity.y() + ", "
-            + MString() + requiredVelocity.z() + ")";
-        MGlobal::displayInfo(msg);
-        // MOVE THIS PART OUT OF FOR CYCLE
 
         body->setLinearVelocity(requiredVelocity);
         this->bulletCollisionHandler.updateWorld(50);
@@ -128,9 +133,12 @@ MStatus CustomMoveManip::doDrag() {
         // Read transform from active object.
         MMatrix activeObjectUpdatedMatrix = this->bulletCollisionHandler.getActiveObjectTransformMMatrix(name);
         this->applyTransformAndRotateToActiveObjectTransform(activeObjectUpdatedMatrix, name);
-
-        return MS::kUnknownParameter;
     }
+
+    this->currentManipPosition = currentTranslation;
+
+    return MS::kUnknownParameter;
+
 }
 
 
