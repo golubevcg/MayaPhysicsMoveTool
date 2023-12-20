@@ -28,21 +28,30 @@ MStatus CustomMoveManip::createChildren() {
     MStatus stat = MStatus::kSuccess;
     MPoint startPoint(0.0, 0.0, 0.0);
     MVector direction(0.0, 1.0, 0.0);
-    this->fFreePointManipDagPath = addFreePointTriadManip("pointManip",
-        "freePoint");
+    this->fFreePointManipDagPath = addFreePointTriadManip(
+        "pointManip",
+        "freePoint"
+    );
+
+    this->fRotateManipDagPath = addRotateManip(
+        "rotateManip", 
+        "rotation"
+    );
+
+    MFnRotateManip rotateManip(fRotateManipDagPath);
+    
+    double myScale[3] = { 0.5, 0.5, 0.5 };
+    rotateManip.scaleBy(myScale);
 
     return stat;
 }
 
 MStatus CustomMoveManip::connectToDependNode(const MObject& node) {
-    MStatus stat;
     //
     // This routine connects the translate plug to the position plug on the freePoint
     // manipulator.
     //
-    MGlobal::displayWarning("---CUSTOMMOVEMANIP connectToDependNode");
-    MFnDependencyNode nodeFn(node);
-    MPlug tPlug = nodeFn.findPlug("translate", true, &stat);
+    MStatus stat;
     MFnFreePointTriadManip freePointManipFn(this->fFreePointManipDagPath);
     this->finishAddingManips();
     MPxManipContainer::connectToDependNode(node);
@@ -56,7 +65,13 @@ void CustomMoveManip::updateManipLocation(const MVector vector) {
 //
     MFnFreePointTriadManip manipFn(this->fFreePointManipDagPath);
     manipFn.setTranslation(vector, MSpace::kWorld);
+
     this->currentManipPosition = vector;
+
+    // Connect the Rotate Manipulator
+    MFnRotateManip rotateManip(this->fRotateManipDagPath);
+    rotateManip.setRotateMode(MFnRotateManip::kObjectSpace);
+    rotateManip.setTranslation(vector, MSpace::kWorld);
 
     MStatus status;
 }
@@ -67,45 +82,35 @@ MStatus CustomMoveManip::doPress() {
 }
 
 MStatus CustomMoveManip::doDrag() {
-    MGlobal::displayWarning("---CUSTOMMOVEMANIP doDrag");
-
     // Update the world.
     this->bulletCollisionHandler.updateWorld(5.0);
 
-    // Read translation from manip.
-
-    MFnManip3D manipFn(this->fFreePointManipDagPath);
     MPoint currentPosition;
-
     this->getConverterManipValue(0, currentPosition);
-    MPoint currentTranslation = manipFn.translation(MSpace::kWorld);
 
-    MGlobal::displayInfo("currentTrnalsation" + MString() + " " + currentTranslation.x + " " + currentTranslation.y + " " + currentTranslation.z);
-    MGlobal::displayInfo("this->currentManipPosition" + MString() + " " + this->currentManipPosition.x + " " + this->currentManipPosition.y + " " + this->currentManipPosition.z);
+    MFnRotateManip rotateManip(this->fRotateManipDagPath);
+    rotateManip.setTranslation(currentPosition, MSpace::kWorld);
 
-    //btVector3 currentPos = body->getWorldTransform().getOrigin();
+    MFnFreePointTriadManip manipFn(this->fFreePointManipDagPath);
+    manipFn.setTranslation(currentPosition, MSpace::kWorld);
+
     btVector3 currentPos(
         this->currentManipPosition.x,
         this->currentManipPosition.z,
         -(this->currentManipPosition.y)
     );
 
-
     btVector3 targetPos(
-        currentTranslation.x,
-        currentTranslation.z,
-        -currentTranslation.y
+        currentPosition.x,
+        currentPosition.z,
+        -currentPosition.y
     );
 
     float timeStep = 1.0f / 60.0f;
     btVector3 requiredVelocity = (targetPos - currentPos) / timeStep;
-
-    requiredVelocity *= 0.01;
-
-    // Define a threshold for negligible values
+    requiredVelocity *= 0.04;
     float threshold = 0.01f;
 
-    // Set small values to zero
     if (std::abs(requiredVelocity.x()) < threshold) requiredVelocity.setX(0);
     if (std::abs(requiredVelocity.y()) < threshold) requiredVelocity.setY(0);
     if (std::abs(requiredVelocity.z()) < threshold) requiredVelocity.setZ(0);
@@ -119,14 +124,9 @@ MStatus CustomMoveManip::doDrag() {
     requiredVelocity.setY(std::min(std::max(requiredVelocity.y(), minValue), maxValue));
     requiredVelocity.setZ(std::min(std::max(requiredVelocity.z(), minValue), maxValue));
 
-    // Print the modified velocity
-    MString msg = "btVector3: (" + MString() + requiredVelocity.x() + ", " + MString() + requiredVelocity.y() + ", " + MString() + requiredVelocity.z() + ")";
-    MGlobal::displayInfo(msg);
-
     for (auto& pair : this->bulletCollisionHandler.activeRigidBodies) {
         std::string name = pair.first;
         btRigidBody* body = pair.second;
-
         body->setLinearVelocity(requiredVelocity);
         this->bulletCollisionHandler.updateWorld(50);
 
@@ -135,23 +135,17 @@ MStatus CustomMoveManip::doDrag() {
         this->applyTransformAndRotateToActiveObjectTransform(activeObjectUpdatedMatrix, name);
     }
 
-    this->currentManipPosition = currentTranslation;
+    this->currentManipPosition = currentPosition;
 
     return MS::kUnknownParameter;
-
 }
 
-
 void CustomMoveManip::applyTransformAndRotateToActiveObjectTransform(MMatrix matrix, std::string name) {
-    MGlobal::displayInfo("NAME:" + MString() + name.c_str());
-
-    
     if (this->collisionCandidatesFinder.activeTransformMFnDagNodes.find(name) == this->collisionCandidatesFinder.activeTransformMFnDagNodes.end()) {
         MGlobal::displayInfo("RETURN!!!!!!");
         return;
     }
 
-    
     MObject mobj = this->collisionCandidatesFinder.activeTransformMFnDagNodes[name];
     MFnDagNode activeDagNode;
     activeDagNode.setObject(mobj);
@@ -159,8 +153,6 @@ void CustomMoveManip::applyTransformAndRotateToActiveObjectTransform(MMatrix mat
     MDagPath dagPath;
     activeDagNode.getPath(dagPath);
     MFnTransform activeTransform(dagPath);
-    MGlobal::displayInfo("dagNodePath:" + MString() + activeDagNode.fullPathName());
-    MGlobal::displayInfo("dagPathPath:" + MString() + dagPath.fullPathName());
 
     // Create an MTransformationMatrix from the input MMatrix
     MTransformationMatrix transMatrix(matrix);
@@ -185,4 +177,3 @@ void CustomMoveManip::applyTransformAndRotateToActiveObjectTransform(MMatrix mat
         return;
     }
 }
-

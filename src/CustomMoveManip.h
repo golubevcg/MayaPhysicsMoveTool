@@ -20,6 +20,7 @@ public:
     void updateManipLocation(const MVector vector);
 public:
     MDagPath fFreePointManipDagPath;
+    MDagPath fRotateManipDagPath;
     static MTypeId id;
     CollisionCandidatesFinder& collisionCandidatesFinder;
     BulletCollisionHandler& bulletCollisionHandler;

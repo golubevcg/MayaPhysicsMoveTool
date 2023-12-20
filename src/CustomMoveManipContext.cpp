@@ -43,7 +43,6 @@ void CustomMoveManipContext::selectionChanged(void* data) {
     if (MS::kSuccess != stat) {
         return;
     }
-    MGlobal::displayWarning("CONTEXT::SELECTION CHANGED!!!!!");
 
     CollisionCandidatesFinder& collisionCandidatesFinder = CollisionCandidatesFinder::getInstance();
     collisionCandidatesFinder.addActiveObjects();
@@ -66,10 +65,9 @@ void CustomMoveManipContext::selectionChanged(void* data) {
     for (; !iter.isDone(); iter.next()) {
         MObject dependNode;
         iter.getDependNode(dependNode);
-        if (dependNode.isNull() || !dependNode.hasFn(MFn::kWorld)) {
+        if (dependNode.isNull() || !dependNode.hasFn(MFn::kTransform)) {
             continue;
         }
-
         MFnTransform transFn(dependNode);
         MMatrix worldMatrix = transFn.transformationMatrix();
         MVector trans(worldMatrix[3][0], worldMatrix[3][1], worldMatrix[3][2]);
@@ -82,8 +80,6 @@ void CustomMoveManipContext::selectionChanged(void* data) {
     if (count > 0) {
         avgPosition /= count;
     }
-
-    MGlobal::displayInfo("avgPosition: " + MString() + avgPosition.x + " " + MString() + avgPosition.y + " " + MString() + avgPosition.z);
 
     // Create a single manipulator at the average position
     MString manipName("customMoveManip");

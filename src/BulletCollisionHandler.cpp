@@ -26,7 +26,6 @@ BulletCollisionHandler::BulletCollisionHandler():
     dispatcher(nullptr),
     solver(nullptr),
     dynamicsWorld(nullptr){
-    MGlobal::displayInfo("CONSTRUUUCTOOOOOOOOOR");
 }
 
 BulletCollisionHandler::~BulletCollisionHandler() {
@@ -88,9 +87,10 @@ void BulletCollisionHandler::updateWorld(float framesToUpdate) {
     // Calculate deltaTime assuming each frame is 1/fps seconds long
     float deltaTime = framesToUpdate / fps;
 
-    int maxSubSteps = 100;
+    int m_numIterations = 10;
+    int maxSubSteps = m_numIterations * 2;
     float fixedTimeStep = 1.f / fps; // This is the time each physics "step" represents at 24fps
-    this->dynamicsWorld->getSolverInfo().m_numIterations = 50; // Example value
+    this->dynamicsWorld->getSolverInfo().m_numIterations = 10; // Example value
 
     // Update the dynamics world by the deltaTime
     this->dynamicsWorld->stepSimulation(deltaTime, maxSubSteps, fixedTimeStep);
@@ -98,7 +98,9 @@ void BulletCollisionHandler::updateWorld(float framesToUpdate) {
 
 void BulletCollisionHandler::updateActiveObjects(std::unordered_map<std::string, MFnMesh*> MFnMeshes)
 {
+    
     this->cleanRigidBodies(this->activeRigidBodies);
+    this->activeRigidBodies.clear();
     for (auto it = MFnMeshes.begin(); it != MFnMeshes.end(); ++it) {
         std::string key = it->first;
         MFnMesh* mesh = it->second;
@@ -111,13 +113,13 @@ void BulletCollisionHandler::updateActiveObjects(std::unordered_map<std::string,
 
 MMatrix BulletCollisionHandler::getActiveObjectTransformMMatrix(std::string meshName) {
     if (this->activeRigidBodies.empty() || this->activeRigidBodies.find(meshName) == this->activeRigidBodies.end()) {
-        MGlobal::displayInfo("CANNOT RETURN CORRECT MATRIX");
         return MMatrix::identity;
     }
 
     btTransform btTrans;
     btRigidBody* activeRigidBody = this->activeRigidBodies[meshName];
     btMotionState* motionState = activeRigidBody->getMotionState();
+
     if (motionState) {
         motionState->getWorldTransform(btTrans);
     }
@@ -143,7 +145,6 @@ bool BulletCollisionHandler::isRigidBodyInWorld(btRigidBody* body) {
 
     return false;
 }
-
 
 void BulletCollisionHandler::cleanRigidBodies(std::unordered_map<std::string, btRigidBody*> rigidBodies) {
     if (rigidBodies.empty()) {
@@ -206,7 +207,6 @@ void BulletCollisionHandler::updateColliders(std::vector<MFnMesh*> collidersMFnM
 
     if (!collidersToRemove.empty()) {
         for (const std::string & colliderName : collidersToRemove) {
-            MGlobal::displayWarning("removing collider: " + MString(colliderName.c_str()));
             btRigidBody* bodyToRemove = this->colliders[colliderName];
             this->deleteCollider(bodyToRemove);
 
@@ -236,7 +236,6 @@ void BulletCollisionHandler::deleteCollider(btRigidBody* collider) {
     }
     delete collider;
 }
-
 
 btRigidBody* BulletCollisionHandler::createFullColliderFromMFnMesh(MFnMesh* mfnMesh) {
     btCollisionShape* newShape = this->convertMFnMeshToStaticCollisionShape(mfnMesh);
@@ -288,7 +287,7 @@ btRigidBody* BulletCollisionHandler::createFullActiveRigidBodyFromMFnMesh(MFnMes
     btTransform bulletTransform = this->getBulletTransformFromMFnMeshTransform(mfnMesh);
 
     // Define the mass of the rigid body
-    float mass = 10000;
+    float mass = 100;
     btVector3 localInertia(0, 0, 0);
     collisionShape->calculateLocalInertia(mass, localInertia);
 
@@ -298,10 +297,10 @@ btRigidBody* BulletCollisionHandler::createFullActiveRigidBodyFromMFnMesh(MFnMes
     btRigidBody* rigidBody = new btRigidBody(rbInfo);
 
     rigidBody->setRestitution(0.000);
-    rigidBody->setFriction(0.00);
-    rigidBody->setRollingFriction(0.15);
-    rigidBody->setSpinningFriction(0.15);
-    rigidBody->setDamping(0.25 * 2, 0.25 * 2);
+    rigidBody->setFriction(0.99);
+    rigidBody->setRollingFriction(0.4);
+    rigidBody->setSpinningFriction(0.4);
+    //rigidBody->setDamping(0.2, 0.2);
 
     rigidBody->setCollisionFlags(rigidBody->getCollisionFlags() | btCollisionObject::CF_DYNAMIC_OBJECT);
     rigidBody->setActivationState(DISABLE_DEACTIVATION);
@@ -323,7 +322,6 @@ btTransform BulletCollisionHandler::getBulletTransformFromMFnMeshTransform(MFnMe
     MDagPath dagPath;
     mfnMesh->getPath(dagPath);
 
-    MGlobal::displayInfo("DAGPATH OBJECT FULL PATH" + dagPath.fullPathName());
     MMatrix worldMatrix = dagPath.inclusiveMatrix();
 
     // Convert Maya's transformation matrix to Bullet's btTransform
@@ -432,6 +430,7 @@ btTransform BulletCollisionHandler::convertMayaToBulletMatrix(const MMatrix& may
 }
 
 MMatrix BulletCollisionHandler::convertBulletToMayaMatrix(const btTransform& bulletTransform) {
+
     btQuaternion bulletQuat = bulletTransform.getRotation();
 
     // Convert Bullet quaternion to Maya quaternion
@@ -443,8 +442,8 @@ MMatrix BulletCollisionHandler::convertBulletToMayaMatrix(const btTransform& bul
 
     // Adjust the translation for Maya's coordinate system (Y-up)
     mayaMatrix[3][0] = bulletTranslation.getX();
-    mayaMatrix[3][1] = -bulletTranslation.getZ();  // Inverting Z axis
-    mayaMatrix[3][2] = bulletTranslation.getY();  // Swapping Y and Z
+    mayaMatrix[3][1] = -bulletTranslation.getZ(); 
+    mayaMatrix[3][2] = bulletTranslation.getY();
 
     // Reset the scale component of the matrix to 1
     for (int i = 0; i < 3; ++i) {
