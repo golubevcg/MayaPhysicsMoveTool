@@ -7,7 +7,6 @@
 #include <LinearMath/btAlignedObjectArray.h>
 #include <btBulletDynamicsCommon.h>
 
-
 BulletCollisionHandler* BulletCollisionHandler::instance = nullptr;
 std::once_flag BulletCollisionHandler::initInstanceFlag;
 
@@ -34,7 +33,6 @@ BulletCollisionHandler::~BulletCollisionHandler() {
 
 void BulletCollisionHandler::createDynamicsWorld() {
     if (this->dynamicsWorld == nullptr) {
-        // Create the dynamics world
         this->broadphase = new btDbvtBroadphase();
         this->collisionConfiguration = new btDefaultCollisionConfiguration();
         this->dispatcher = new btCollisionDispatcher(collisionConfiguration);
@@ -89,16 +87,14 @@ void BulletCollisionHandler::updateWorld(float framesToUpdate) {
 
     int m_numIterations = 10;
     int maxSubSteps = m_numIterations * 2;
-    float fixedTimeStep = 1.f / fps; // This is the time each physics "step" represents at 24fps
-    this->dynamicsWorld->getSolverInfo().m_numIterations = 10; // Example value
+    float fixedTimeStep = 1.f / fps;
+    this->dynamicsWorld->getSolverInfo().m_numIterations = 10;
 
     // Update the dynamics world by the deltaTime
     this->dynamicsWorld->stepSimulation(deltaTime, maxSubSteps, fixedTimeStep);
 }
 
-void BulletCollisionHandler::updateActiveObjects(std::unordered_map<std::string, MFnMesh*> MFnMeshes)
-{
-    
+void BulletCollisionHandler::updateActiveObjects(std::unordered_map<std::string, MFnMesh*> MFnMeshes) {
     this->cleanRigidBodies(this->activeRigidBodies);
     this->activeRigidBodies.clear();
     for (auto it = MFnMeshes.begin(); it != MFnMeshes.end(); ++it) {
@@ -119,7 +115,6 @@ MMatrix BulletCollisionHandler::getActiveObjectTransformMMatrix(std::string mesh
     btTransform btTrans;
     btRigidBody* activeRigidBody = this->activeRigidBodies[meshName];
     btMotionState* motionState = activeRigidBody->getMotionState();
-
     if (motionState) {
         motionState->getWorldTransform(btTrans);
     }
@@ -142,7 +137,6 @@ bool BulletCollisionHandler::isRigidBodyInWorld(btRigidBody* body) {
             return true;
         }
     }
-
     return false;
 }
 
@@ -160,8 +154,6 @@ void BulletCollisionHandler::cleanRigidBodies(std::unordered_map<std::string, bt
         if (!this->isRigidBodyInWorld(body)) {
             return;
         }
-
-        // Remove it from the world
         this->dynamicsWorld->removeRigidBody(body);
         delete body->getMotionState();
         delete body;
@@ -170,15 +162,8 @@ void BulletCollisionHandler::cleanRigidBodies(std::unordered_map<std::string, bt
 }
 
 void BulletCollisionHandler::updateColliders(std::vector<MFnMesh*> collidersMFnMeshes, std::unordered_map<std::string, MFnMesh*> excludeMeshes) {
-
-    /*
-    if you already had colliders then update existing ones
-    else
-    create new ones
-    */
-
+    //if you already had colliders then update existing ones else create new ones
     std::vector <std::string> collidersToRemove;
-
     // Add new colliders based on the provided MFnMeshes
     for (auto& mfnMesh : collidersMFnMeshes) {
         std::string fullPathName = mfnMesh->fullPathName().asChar();
@@ -209,10 +194,8 @@ void BulletCollisionHandler::updateColliders(std::vector<MFnMesh*> collidersMFnM
         for (const std::string & colliderName : collidersToRemove) {
             btRigidBody* bodyToRemove = this->colliders[colliderName];
             this->deleteCollider(bodyToRemove);
-
             colliders.erase(colliderName);
         }
-
     }
     MGlobal::displayInfo("Colliders were updated!");
 }
@@ -229,6 +212,7 @@ void BulletCollisionHandler::clearColliders() {
 }
 
 void BulletCollisionHandler::deleteCollider(btRigidBody* collider) {
+    // Delete single collider
     this->dynamicsWorld->removeCollisionObject(collider);
     delete collider->getCollisionShape();
     if (collider->getMotionState()) {
@@ -239,8 +223,6 @@ void BulletCollisionHandler::deleteCollider(btRigidBody* collider) {
 
 btRigidBody* BulletCollisionHandler::createFullColliderFromMFnMesh(MFnMesh* mfnMesh) {
     btCollisionShape* newShape = this->convertMFnMeshToStaticCollisionShape(mfnMesh);
-    //newShape->setMargin(0.05);
-
     btTransform bulletTransform = btTransform::getIdentity();
 
     // Create a rigid body with a mass of 0 for a static object
@@ -250,13 +232,11 @@ btRigidBody* BulletCollisionHandler::createFullColliderFromMFnMesh(MFnMesh* mfnM
 
     rigidBody->setCollisionFlags(rigidBody->getCollisionFlags() | btCollisionObject::CF_STATIC_OBJECT);
     rigidBody->setActivationState(DISABLE_DEACTIVATION);
-
     rigidBody->setRestitution(0.000);
     rigidBody->setFriction(0.00);
     rigidBody->setRollingFriction(0.15);
     rigidBody->setSpinningFriction(0.15);
     rigidBody->setDamping(0.25*0.25, 0.25 * 0.25);
-    //rigidBody->setContactStiffnessAndDamping(1e5, 0.1); // Example values
 
     return rigidBody;
 }
@@ -317,13 +297,9 @@ void BulletCollisionHandler::stopVelocitiesInWorld() {
     }
 
     for (auto& pair : activeRigidBodies) {
-        std::string bodyName = pair.first; // Key (String)
-        btRigidBody* body = pair.second;   // Value (Pointer to btRigidBody)
-
-        // Check if the body is valid and active
+        std::string bodyName = pair.first;
+        btRigidBody* body = pair.second;
         if (body && body->isActive()) {
-            // Perform operations on the active rigid body here
-            // For example, setting velocities to zero
             body->setLinearVelocity(btVector3(0, 0, 0));
             body->setAngularVelocity(btVector3(0, 0, 0));
         }
@@ -332,20 +308,14 @@ void BulletCollisionHandler::stopVelocitiesInWorld() {
 
 btTransform BulletCollisionHandler::getBulletTransformFromMFnMeshTransform(MFnMesh* mfnMesh) {
     if (!mfnMesh) {
-        // Handle the case where mfnMesh is null
-        // For example, return an identity transform or throw an exception
         return btTransform::getIdentity();
     }
 
-    // Extract the transformation from MFnMesh
     MDagPath dagPath;
     mfnMesh->getPath(dagPath);
-
     MMatrix worldMatrix = dagPath.inclusiveMatrix();
 
-    // Convert Maya's transformation matrix to Bullet's btTransform
     btTransform bulletTransform = convertMayaToBulletMatrix(worldMatrix);
-
     return bulletTransform;
 }
 
@@ -366,14 +336,11 @@ btCollisionShape* BulletCollisionHandler::convertMFnMeshToStaticCollisionShape(M
     for (unsigned int i = 0; i < triangleCounts.length(); ++i) {
         for (int j = 0; j < triangleCounts[i]; ++j) {
             btVector3 vertices[3];
-
             for (int k = 0; k < 3; ++k) {
                 // Get the vertex index
                 int vertexIndex = triangleVertices[triangleIndex + k];
-
                 // Transform the vertex position to world space
                 MPoint worldSpaceVertex = mayaVertices[vertexIndex];
-
                 // Add vertex to Bullet triangle mesh
                 // Convert from Maya's right-handed Y-up to Bullet's left-handed Z-up system
                 vertices[k] = btVector3(
@@ -382,11 +349,8 @@ btCollisionShape* BulletCollisionHandler::convertMFnMeshToStaticCollisionShape(M
                     static_cast<btScalar>(-worldSpaceVertex.y)
                 ); // Invert Z for left-handed system
             }
-
             // Add the triangle to the mesh
-            //triMesh->addTriangle(vertices[0], vertices[2], vertices[1]);
             triMesh->addTriangle(vertices[0], vertices[1], vertices[2]);
-
             // Move to the next set of vertices
             triangleIndex += 3;
         }
@@ -406,26 +370,20 @@ btCollisionShape* BulletCollisionHandler::convertMFnMeshToActiveCollisionShape(M
 
     // Create the Bullet convex hull shape
     btConvexHullShape* convexHull = new btConvexHullShape();
-
     // Loop through the vertices and add them to the convex hull
     for (unsigned int i = 0; i < mayaVertices.length(); ++i) {
         MPoint vertex = mayaVertices[i];
-
         // Convert from Maya's right-handed Y-up to Bullet's left-handed Z-up system
         btVector3 bulletVertex(
             static_cast<btScalar>(vertex.x),
             static_cast<btScalar>(vertex.z), // Swap Y and Z
             static_cast<btScalar>(-vertex.y) // Invert Z for left-handed system
         );
-
         // Add the vertex to the convex hull shape
         convexHull->addPoint(bulletVertex);
     }
-
-    // Optionally: Optimize the shape
     convexHull->optimizeConvexHull();
     convexHull->initializePolyhedralFeatures();
-
     return convexHull;
 }
 
@@ -437,7 +395,6 @@ btTransform BulletCollisionHandler::convertMayaToBulletMatrix(const MMatrix& may
     btQuaternion bulletQuat(mayaQuat.x, mayaQuat.z, -mayaQuat.y, mayaQuat.w);
 
     MVector mayaTranslation = mayaTransMatrix.getTranslation(MSpace::kWorld);
-
     // Adjust the translation for Bullet's coordinate system (Z-up)
     btVector3 bulletTranslation(mayaTranslation.x, mayaTranslation.z, -mayaTranslation.y);
 
@@ -449,16 +406,12 @@ btTransform BulletCollisionHandler::convertMayaToBulletMatrix(const MMatrix& may
 }
 
 MMatrix BulletCollisionHandler::convertBulletToMayaMatrix(const btTransform& bulletTransform) {
-
     btQuaternion bulletQuat = bulletTransform.getRotation();
-
     // Convert Bullet quaternion to Maya quaternion
     MQuaternion mayaQuat(bulletQuat.getX(), -bulletQuat.getZ(), bulletQuat.getY(), bulletQuat.getW());
-
     MMatrix mayaMatrix = mayaQuat.asMatrix();
 
     btVector3 bulletTranslation = bulletTransform.getOrigin();
-
     // Adjust the translation for Maya's coordinate system (Y-up)
     mayaMatrix[3][0] = bulletTranslation.getX();
     mayaMatrix[3][1] = -bulletTranslation.getZ(); 
@@ -475,7 +428,5 @@ MMatrix BulletCollisionHandler::convertBulletToMayaMatrix(const btTransform& bul
             }
         }
     }
-
     return mayaMatrix;
 }
-

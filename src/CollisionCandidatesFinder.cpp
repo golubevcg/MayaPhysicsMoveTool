@@ -14,16 +14,7 @@ void CollisionCandidatesFinder::initSingleton() {
     instance = new CollisionCandidatesFinder();
 }
 
-CollisionCandidatesFinder::CollisionCandidatesFinder(){
-
-}
-
-CollisionCandidatesFinder::~CollisionCandidatesFinder() {
-    for (MFnMesh* mesh : this->allSceneMFnMeshes) {
-        delete mesh;
-    }
-}
-
+// Iterate over selected object children and find all MFnMeshes
 MStatus CollisionCandidatesFinder::addActiveObjects() {
     MGlobal::getActiveSelectionList(this->selList);
     if (this->selList.isEmpty()) {
@@ -54,15 +45,10 @@ MStatus CollisionCandidatesFinder::addActiveObjects() {
                 }
 
                 MFnMesh mesh(child);
-                MString infoMessage = "Active mesh object was found: " + mesh.name();
-                MGlobal::displayInfo(infoMessage);
-
                 std::string fullName = mesh.fullPathName().asChar();
                 this->activeMFnMeshes[fullName] = new MFnMesh(child);
                 meshFound = true;
-
                 this->activeTransformMFnDagNodes[fullName] = dependNode;
-
                 break;
             }
 
@@ -84,6 +70,7 @@ MStatus CollisionCandidatesFinder::addActiveObjects() {
     return MS::kSuccess;
 }
 
+// Get map of all scene MFnMeshes with name : MFnMesh signature
 MStatus CollisionCandidatesFinder::getSceneMFnMeshes() {
     MStatus status;
     MItDag dagIterator(MItDag::kDepthFirst, MFn::kMesh, &status);

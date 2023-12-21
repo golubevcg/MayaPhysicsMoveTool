@@ -72,16 +72,17 @@ void CustomMoveManipContext::setupDynamicWorldSingletons() {
 }
 
 MVector CustomMoveManipContext::getAveragePositionFromSelection() {
+    MVector avgPosition(0.0, 0.0, 0.0);
+
     MStatus stat = MStatus::kSuccess;
     MSelectionList list;
     stat = MGlobal::getActiveSelectionList(list);
     MItSelectionList iter(list, MFn::kInvalid, &stat);
     if (MS::kSuccess != stat) {
-        return;
+        return avgPosition;
     }
 
     unsigned int count = 0;
-    MVector avgPosition(0.0, 0.0, 0.0);
 
     // Iterate over all selected objects and accumulate positions
     for (; !iter.isDone(); iter.next()) {
