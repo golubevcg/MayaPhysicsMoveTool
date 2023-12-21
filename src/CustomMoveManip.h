@@ -5,6 +5,10 @@
 #include <CollisionCandidatesFinder.h>
 #include <BulletCollisionHandler.h>
 
+//
+// CustomMoveManip
+// This class is a simple context to register our custom command and manipulator.
+//
 class CustomMoveManip : public MPxManipContainer {
     public:
         CustomMoveManip();
@@ -28,13 +32,10 @@ class CustomMoveManip : public MPxManipContainer {
         MDagPath yScaleManipDagPath;
         MDagPath zScaleManipDagPath;
 
-
         static MTypeId id;
         CollisionCandidatesFinder& collisionCandidatesFinder;
         BulletCollisionHandler& bulletCollisionHandler;
         MPoint currentManipPosition;
-        MVector avgPosition;
-
 };
 
 #endif // CUSTOM_MOVE_MANIP_H

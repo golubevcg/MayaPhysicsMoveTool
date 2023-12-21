@@ -24,11 +24,7 @@ class CollisionCandidatesFinder {
 
     public:
         MSelectionList selList;
-        /*
-        MFnMesh* activeMFnMeshes;
-        MFnDagNode activeTransformMFnDagNodes;
-        */
-
+        
         std::unordered_map<std::string, MFnMesh*> activeMFnMeshes;
         std::unordered_map<std::string, MObject> activeTransformMFnDagNodes;
         std::vector<MFnMesh*> allSceneMFnMeshes;

@@ -2,19 +2,17 @@
 #include <CustomMoveManip.h>
 #include <MayaIncludes.h>
 
-//
-// MoveManipContext
-// This class is a simple context to support our custom a move manipulator.
-//
 CustomMoveManipContext::CustomMoveManipContext() {
     MString str("Plugin move Manipulator");
     setTitleString(str);
 }
 
+/**
+ * Called when the tool is activated. Sets up the help string and selection changed callback.
+ */
 void CustomMoveManipContext::toolOnSetup(MEvent&) {
     MString str("Move the object using the manipulator");
     setHelpString(str);
-    //selectionChanged(this);
     MStatus status;
     this->id = MModelMessage::addCallback(MModelMessage::kActiveListModified, selectionChanged, this, &status);
     if (!status) {
@@ -22,31 +20,47 @@ void CustomMoveManipContext::toolOnSetup(MEvent&) {
     }
 }
 
+/**
+ * Called when the tool is deactivated. Cleans up by removing the callback.
+ */
 void CustomMoveManipContext::toolOffCleanup() {
     MStatus status;
     status = MModelMessage::removeCallback(this->id);
     if (!status) {
         MGlobal::displayError("Model remove callback failed");
     }
-
     MPxContext::toolOffCleanup();
 }
 
+/**
+ * Static callback function for selection changes. Updates manipulators based on the new selection.
+ * Also updates all colliders based on all MFnMeshes inside scene, setups up activeRigidBodies based on selected MFnMesh
+ * and initializes bullet3 dynamics world.
+ * @param data Custom data for the callback.
+ */
 void CustomMoveManipContext::selectionChanged(void* data) {
-    MStatus stat = MStatus::kSuccess;
-
     CustomMoveManipContext* ctxPtr = (CustomMoveManipContext*)data;
     ctxPtr->deleteManipulators();
-    MSelectionList list;
-    stat = MGlobal::getActiveSelectionList(list);
-    MItSelectionList iter(list, MFn::kInvalid, &stat);
-    if (MS::kSuccess != stat) {
-        return;
-    }
 
+    CustomMoveManipContext::setupDynamicWorldSingletons();
+
+    // Create a single manipulator at the average position
+    MString manipName("customMoveManip");
+    MObject manipObject;
+    CustomMoveManip* manipulator = (CustomMoveManip*)CustomMoveManip::newManipulator(manipName, manipObject);
+
+    if (manipulator != NULL) {
+        MVector avgPosition;
+        avgPosition = CustomMoveManipContext::getAveragePositionFromSelection();
+
+        ctxPtr->addManipulator(manipObject);
+        manipulator->updateManipLocation(avgPosition);
+    }
+}
+
+void CustomMoveManipContext::setupDynamicWorldSingletons() {
     CollisionCandidatesFinder& collisionCandidatesFinder = CollisionCandidatesFinder::getInstance();
     collisionCandidatesFinder.addActiveObjects();
-    // update this
     if (collisionCandidatesFinder.allSceneMFnMeshes.empty()) {
         collisionCandidatesFinder.getSceneMFnMeshes();
     }
@@ -54,12 +68,20 @@ void CustomMoveManipContext::selectionChanged(void* data) {
     BulletCollisionHandler& bulletCollisionHandler = BulletCollisionHandler::getInstance();
     bulletCollisionHandler.createDynamicsWorld();
     bulletCollisionHandler.updateActiveObjects(collisionCandidatesFinder.activeMFnMeshes);
-
-    // update this
     bulletCollisionHandler.updateColliders(collisionCandidatesFinder.allSceneMFnMeshes, collisionCandidatesFinder.activeMFnMeshes);
+}
 
-    MVector avgPosition(0.0, 0.0, 0.0);
+MVector CustomMoveManipContext::getAveragePositionFromSelection() {
+    MStatus stat = MStatus::kSuccess;
+    MSelectionList list;
+    stat = MGlobal::getActiveSelectionList(list);
+    MItSelectionList iter(list, MFn::kInvalid, &stat);
+    if (MS::kSuccess != stat) {
+        return;
+    }
+
     unsigned int count = 0;
+    MVector avgPosition(0.0, 0.0, 0.0);
 
     // Iterate over all selected objects and accumulate positions
     for (; !iter.isDone(); iter.next()) {
@@ -76,19 +98,10 @@ void CustomMoveManipContext::selectionChanged(void* data) {
     }
     iter.reset();
 
-    // Calculate the average position
+    // Calculate the average position for manip placement
     if (count > 0) {
         avgPosition /= count;
     }
 
-    // Create a single manipulator at the average position
-    MString manipName("customMoveManip");
-    MObject manipObject;
-    CustomMoveManip* manipulator = (CustomMoveManip*)CustomMoveManip::newManipulator(manipName, manipObject);
-
-    if (manipulator != NULL) {
-        ctxPtr->addManipulator(manipObject);
-        manipulator->updateManipLocation(avgPosition);
-    }
+    return avgPosition;
 }
-

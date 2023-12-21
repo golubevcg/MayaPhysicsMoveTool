@@ -35,47 +35,6 @@ MStatus CustomMoveManip::createChildren() {
     double transformManipHandleScale[3] = { 1.25, 1.25, 1.25 };
     manipFn.scaleBy(transformManipHandleScale);
 
-    /*
-    this->fRotateManipDagPath = addRotateManip(
-        "rotateManip", 
-        "rotation"
-    );
-
-    MFnRotateManip rotateManip(fRotateManipDagPath);
-    double rotateManipHandleScale[3] = { 0.5, 0.5, 0.5 };
-    rotateManip.scaleBy(rotateManipHandleScale);
-
-    if (this->collisionCandidatesFinder.activeTransformMFnDagNodes.size() > 1) {
-        double scale_manip_scale[3] = { 1.5, 1.5, 1.5 };
-        this->xScaleManipDagPath = addDistanceManip(
-            "scaleXManip",
-            "scaleX"
-        );
-        MFnDistanceManip xDistanceFn(this->xScaleManipDagPath);
-        MVector xDirection(-3.0, 0.0, 0.0);
-        xDistanceFn.setDirection(xDirection);
-        xDistanceFn.scaleBy(scale_manip_scale);
-
-        this->yScaleManipDagPath = addDistanceManip(
-            "scaleYManip",
-            "scaleY"
-        );
-        MFnDistanceManip yDistanceFn(this->yScaleManipDagPath);
-        MVector yDirection(0, -3.0, 0.0);
-        yDistanceFn.setDirection(yDirection);
-        yDistanceFn.scaleBy(scale_manip_scale);
-
-
-        this->zScaleManipDagPath = addDistanceManip(
-            "scaleZManip",
-            "scaleZ"
-        );
-        MFnDistanceManip zDistanceFn(this->zScaleManipDagPath);
-        MVector zDirection(0, 0.0, -3.0);
-        zDistanceFn.setDirection(zDirection);
-        zDistanceFn.scaleBy(scale_manip_scale);
-    }
-    */
     return stat;
 }
 
@@ -85,16 +44,8 @@ MStatus CustomMoveManip::connectToDependNode(const MObject& node) {
     // manipulator.
     //
     MStatus stat;
-    /*
-    MFnDependencyNode nodeFn(node);
-    MPlug tPlug = nodeFn.findPlug("translate", true, &stat);
-    MFnFreePointTriadManip freePointManipFn(this->fFreePointManipDagPath);
-    freePointManipFn.connectToPointPlug(tPlug);
-    */
     this->finishAddingManips();
     MPxManipContainer::connectToDependNode(node);
-
-
     return stat;
 }
 
@@ -107,25 +58,6 @@ void CustomMoveManip::updateManipLocation(const MVector vector) {
     manipFn.setTranslation(vector, MSpace::kWorld);
     this->currentManipPosition = vector;
 
-    /*
-
-    // Connect the Rotate Manipulator
-    MFnRotateManip rotateManip(this->fRotateManipDagPath);
-    rotateManip.setRotateMode(MFnRotateManip::kObjectSpace);
-    rotateManip.setTranslation(vector, MSpace::kWorld);
-
-    if (this->collisionCandidatesFinder.activeTransformMFnDagNodes.size() > 1) {
-        MFnDistanceManip xScaleManip(this->xScaleManipDagPath);
-        xScaleManip.setTranslation(vector, MSpace::kWorld);
-
-        MFnDistanceManip yScaleManip(this->yScaleManipDagPath);
-        yScaleManip.setTranslation(vector, MSpace::kWorld);
-
-        MFnDistanceManip zScaleManip(this->zScaleManipDagPath);
-        zScaleManip.setTranslation(vector, MSpace::kWorld);
-    }*/
-
-
     MStatus status;
 }
 
@@ -135,41 +67,9 @@ MStatus CustomMoveManip::doPress() {
 }
 
 MStatus CustomMoveManip::doDrag() {
-    // Update the world.
-    //this->bulletCollisionHandler.updateWorld(10);
-
     // object pos of locator
     MPoint currentPosition;
     this->getConverterManipValue(0, currentPosition);
-
-    // object pos of locator
-    MEulerRotation rotPos;
-    this->getConverterManipValue(0, rotPos);
-
-    // object pos of locator
-    unsigned scXPos;
-    this->getConverterManipValue(0, scXPos);
-
-    // object pos of locator
-    double scYPos;
-    this->getConverterManipValue(0, scYPos);
-
-    // object pos of locator
-    MPoint scZPos;
-    this->getConverterManipValue(0, scZPos);
-
-    MFnFreePointTriadManip testFreePointManip(this->fFreePointManipDagPath);
-    MPoint testManipPosition = testFreePointManip.getTranslation(MSpace::kWorld);
-
-    /*
-    MGlobal::displayInfo("******");
-    MGlobal::displayInfo("testManipPosition:" + MString() + testManipPosition.x + MString(",") + testManipPosition.y + MString(",") + testManipPosition.z);
-    MGlobal::displayInfo("rotPos euler:" + MString() + rotPos.x + MString(",") + rotPos.y + MString(",") + rotPos.z);
-    MGlobal::displayInfo("scXPos unsigned int:" + MString() + scXPos);
-    MGlobal::displayInfo("scYPos double:" + MString() + scYPos);
-    MGlobal::displayInfo("scZPos:" + MString() + scZPos.x + MString(",") + scZPos.y + MString(",") + scZPos.z);
-    */
-    MGlobal::displayInfo("******");
 
     btVector3 currentPos(
         this->currentManipPosition.x,
@@ -207,6 +107,18 @@ MStatus CustomMoveManip::doDrag() {
     for (auto& pair : this->bulletCollisionHandler.activeRigidBodies) {
         btRigidBody* body = pair.second;
         body->setLinearVelocity(requiredVelocity);
+        
+        std::string name = pair.first;
+        MMatrix transf = this->bulletCollisionHandler.getActiveObjectTransformMMatrix(name);
+
+        MMatrix matrix;
+        MTransformationMatrix mtm(matrix);
+        MVector translation = mtm.getTranslation(MSpace::kWorld);
+        MGlobal::displayInfo("bullet Translation: " + MString() + translation.x + ", " + translation.y + ", " + translation.z);
+
+
+        // get body position directly and print it
+        // convert maya position, convert it to bullet and print it
     }
 
     this->bulletCollisionHandler.updateWorld(10);
@@ -227,43 +139,20 @@ MStatus CustomMoveManip::doDrag() {
         count++;
     }
 
-
     if (count > 0) {
         avgPosition /= count;
     }
-    this->avgPosition = avgPosition;
 
     this->currentManipPosition = currentPosition;
 
-    //MGlobal::displayInfo("avgPosition:" + MString() + avgPosition.x + MString(",") + avgPosition.y + MString(",") + avgPosition.z);
     MFnFreePointTriadManip manipFn(this->fFreePointManipDagPath);
     manipFn.setTranslation(avgPosition, MSpace::kWorld);
-
-    //MPoint manipPoint(avgPosition.x, avgPosition.y, avgPosition.z);
-    //manipFn.setPoint(manipPoint);
-    //manipFn.translateBy(avgPosition, MSpace::kWorld);
-    /*
-    MFnRotateManip rotateManip(this->fRotateManipDagPath);
-    rotateManip.setTranslation(avgPosition, MSpace::kWorld);
-    */
-
-    //MVector test_pos = manipFn.getTranslation(MSpace::kWorld);
-    //MGlobal::displayInfo("test_pos :" + MString() + test_pos.x + MString(",") + test_pos.y + MString(",") + test_pos.z);
 
     return MS::kUnknownParameter;
 }
 
 MStatus CustomMoveManip::doRelease() {
     MStatus status = MPxManipContainer::doRelease();
-    MGlobal::displayInfo("doPress event!!!!");
-    MFnFreePointTriadManip manipFn(this->fFreePointManipDagPath);
-    manipFn.setTranslation(this->avgPosition, MSpace::kWorld);
-
-    MPoint manipPoint(avgPosition.x, avgPosition.y, avgPosition.z);
-    manipFn.setPoint(manipPoint);
-    manipFn.translateBy(avgPosition, MSpace::kWorld);
-    MGlobal::executeCommand("refresh");
-    return status;
 }
 
 void CustomMoveManip::applyTransformAndRotateToActiveObjectTransform(MMatrix matrix, std::string name) {
