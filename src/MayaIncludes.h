@@ -30,5 +30,6 @@
 #include <maya/MFloatPointArray.h>
 #include <maya/MFnRotateManip.h>
 #include <maya/MQtUtil.h>
+#include <maya/MFnScaleManip.h>
 
 #endif //MAYA_INCLUDES_H

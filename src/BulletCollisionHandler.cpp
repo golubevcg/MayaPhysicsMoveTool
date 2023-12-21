@@ -287,7 +287,7 @@ btRigidBody* BulletCollisionHandler::createFullActiveRigidBodyFromMFnMesh(MFnMes
     btTransform bulletTransform = this->getBulletTransformFromMFnMeshTransform(mfnMesh);
 
     // Define the mass of the rigid body
-    float mass = 100;
+    float mass = 1;
     btVector3 localInertia(0, 0, 0);
     collisionShape->calculateLocalInertia(mass, localInertia);
 
@@ -298,9 +298,9 @@ btRigidBody* BulletCollisionHandler::createFullActiveRigidBodyFromMFnMesh(MFnMes
 
     rigidBody->setRestitution(0.000);
     rigidBody->setFriction(0.99);
-    rigidBody->setRollingFriction(0.4);
-    rigidBody->setSpinningFriction(0.4);
-    //rigidBody->setDamping(0.2, 0.2);
+    rigidBody->setRollingFriction(0.9);
+    rigidBody->setSpinningFriction(0.9);
+    rigidBody->setDamping(0.005, 0.005);
 
     rigidBody->setCollisionFlags(rigidBody->getCollisionFlags() | btCollisionObject::CF_DYNAMIC_OBJECT);
     rigidBody->setActivationState(DISABLE_DEACTIVATION);
@@ -309,6 +309,25 @@ btRigidBody* BulletCollisionHandler::createFullActiveRigidBodyFromMFnMesh(MFnMes
     this->dynamicsWorld->addRigidBody(rigidBody, btBroadphaseProxy::DefaultFilter, btBroadphaseProxy::AllFilter);
 
     return rigidBody;
+}
+
+void BulletCollisionHandler::stopVelocitiesInWorld() {
+    if (activeRigidBodies.empty()) {
+        return;
+    }
+
+    for (auto& pair : activeRigidBodies) {
+        std::string bodyName = pair.first; // Key (String)
+        btRigidBody* body = pair.second;   // Value (Pointer to btRigidBody)
+
+        // Check if the body is valid and active
+        if (body && body->isActive()) {
+            // Perform operations on the active rigid body here
+            // For example, setting velocities to zero
+            body->setLinearVelocity(btVector3(0, 0, 0));
+            body->setAngularVelocity(btVector3(0, 0, 0));
+        }
+    }
 }
 
 btTransform BulletCollisionHandler::getBulletTransformFromMFnMeshTransform(MFnMesh* mfnMesh) {
@@ -415,9 +434,9 @@ btTransform BulletCollisionHandler::convertMayaToBulletMatrix(const MMatrix& may
     MQuaternion mayaQuat = mayaTransMatrix.rotation();
 
     // Convert Maya quaternion to Bullet quaternion, adjusting for coordinate system differences
-    btQuaternion bulletQuat(mayaQuat.x, -mayaQuat.z, mayaQuat.y, mayaQuat.w);
+    btQuaternion bulletQuat(mayaQuat.x, mayaQuat.z, -mayaQuat.y, mayaQuat.w);
 
-    MVector mayaTranslation = mayaTransMatrix.getTranslation(MSpace::kTransform);
+    MVector mayaTranslation = mayaTransMatrix.getTranslation(MSpace::kWorld);
 
     // Adjust the translation for Bullet's coordinate system (Z-up)
     btVector3 bulletTranslation(mayaTranslation.x, mayaTranslation.z, -mayaTranslation.y);

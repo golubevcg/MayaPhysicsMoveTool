@@ -91,3 +91,4 @@ void CustomMoveManipContext::selectionChanged(void* data) {
         manipulator->updateManipLocation(avgPosition);
     }
 }
+

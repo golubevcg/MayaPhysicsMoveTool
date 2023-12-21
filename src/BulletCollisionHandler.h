@@ -42,6 +42,7 @@ class BulletCollisionHandler
         btTransform getBulletTransformFromMFnMeshTransform(MFnMesh* mfnMesh);
 
         void updateWorld(float framesToUpdate);
+        void stopVelocitiesInWorld();
 
         std::unordered_map<std::string, btRigidBody*> activeRigidBodies;
         std::unordered_map<std::string, btRigidBody*> colliders;

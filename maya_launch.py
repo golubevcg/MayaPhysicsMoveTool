@@ -23,3 +23,4 @@ cmds.customMoveManipContext('customMoveManipContext1')
 cmds.refresh()
 cmds.select("pCube5")
 cmds.setToolTo('customMoveManipContext1')
+
