@@ -14,6 +14,15 @@ void CollisionCandidatesFinder::initSingleton() {
     instance = new CollisionCandidatesFinder();
 }
 
+CollisionCandidatesFinder::CollisionCandidatesFinder() {
+
+}
+
+CollisionCandidatesFinder::~CollisionCandidatesFinder() {
+
+}
+
+
 // Iterate over selected object children and find all MFnMeshes
 MStatus CollisionCandidatesFinder::addActiveObjects() {
     MGlobal::getActiveSelectionList(this->selList);
