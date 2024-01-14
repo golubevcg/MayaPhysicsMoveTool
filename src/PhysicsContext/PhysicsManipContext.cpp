@@ -42,7 +42,7 @@ void PhysicsManipContext::selectionChanged(void* data) {
     PhysicsManipContext* ctxPtr = (PhysicsManipContext*)data;
     ctxPtr->deleteManipulators();
 
-    PhysicsManipContext::setupDynamicWorldSingletons();
+    PhysicsManipContext::setupPhysicsWorldSingletons();
 
     // Create a single manipulator at the average position
     MString manipName("physicsMoveManip");
@@ -58,7 +58,7 @@ void PhysicsManipContext::selectionChanged(void* data) {
     }
 }
 
-void PhysicsManipContext::setupDynamicWorldSingletons() {
+void PhysicsManipContext::setupPhysicsWorldSingletons() {
     CollisionCandidatesFinder& collisionCandidatesFinder = CollisionCandidatesFinder::getInstance();
     collisionCandidatesFinder.addActiveObjects();
     if (collisionCandidatesFinder.allSceneMFnMeshes.empty()) {

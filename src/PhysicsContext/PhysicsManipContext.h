@@ -39,9 +39,9 @@ class PhysicsManipContext : public MPxSelectionContext {
         static void selectionChanged(void* data);
 
         /**
-         * @brief Initialize Dynamic world singletons
+         * @brief Initialize Physics world singletons
          */
-        static void setupDynamicWorldSingletons();
+        static void setupPhysicsWorldSingletons();
 
         /**
          * @brief Get average position from selected object
