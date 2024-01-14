@@ -1,25 +1,25 @@
-#ifndef CUSTOM_MOVE_MANIP_CONTEXT_H
-#define CUSTOM_MOVE_MANIP_CONTEXT_H
+#ifndef PHYSICS_MANIP_CONTEXT_H
+#define PHYSICS_MANIP_CONTEXT_H
 
-#include <MayaIncludes.h>
-#include <CustomMoveManip.h>
-#include <CollisionCandidatesFinder.h>
-#include <BulletCollisionHandler.h>
+#include "../MayaIncludes.h"
+#include "../PhysicsManips/PhysicsMoveManip.h"
+#include "../CollisionHandlers/CollisionCandidatesFinder.h"
+#include "../CollisionHandlers/BulletCollisionHandler.h"
 
 /**
- * @class CustomMoveManipContext
+ * @class PhysicsManipContext
  * @brief Custom context for handling move manipulations in Maya.
  *
  * This class extends MPxSelectionContext to create a custom manipulation
  * context. It is designed to integrate a custom move manipulator with Maya's
  * selection and interaction framework.
  */
-class CustomMoveManipContext : public MPxSelectionContext {
+class PhysicsManipContext : public MPxSelectionContext {
     public:
         /**
-         * @brief Constructor for CustomMoveManipContext.
+         * @brief Constructor for PhysicsManipContext.
          */
-        CustomMoveManipContext();
+        PhysicsManipContext();
 
         /**
          * @brief Sets up the tool on activation.
@@ -52,4 +52,4 @@ class CustomMoveManipContext : public MPxSelectionContext {
         MCallbackId id; ///< Callback ID for selection change.
 };
 
-#endif // CUSTOM_MOVE_MANIP_CONTEXT_H
+#endif // PHYSICS_MANIP_CONTEXT_H

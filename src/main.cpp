@@ -1,28 +1,28 @@
-#include <CustomMoveManip.h>
-#include <CustomMoveManipContext.h>
+#include "PhysicsManips/PhysicsMoveManip.h"
+#include "PhysicsContext/PhysicsManipContext.h"
 #include <maya/MFnPlugin.h>
-#include <MayaIncludes.h>
+#include "MayaIncludes.h"
 
 /**
- * @class CustomMoveManipContextCommand
- * @brief Command class for creating instances of CustomMoveManipContext.
+ * @class PhysicsManipContextCommand
+ * @brief Command class for creating instances of PhysicsMoveManipContext.
  *
  * This class is responsible for creating and managing instances of the
- * CustomMoveManipContext. It extends MPxContextCommand to integrate with Maya's command system.
+ * PhysicsMoveManipContext. It extends MPxContextCommand to integrate with Maya's command system.
  */
-class CustomMoveManipContextCommand : public MPxContextCommand {
+class PhysicsManipContextCommand : public MPxContextCommand {
     public:
-        CustomMoveManipContextCommand() {};
+        PhysicsManipContextCommand() {};
         MPxContext* makeObj() override;
         static void* creator();
 };
 
-MPxContext* CustomMoveManipContextCommand::makeObj() {
-    return new CustomMoveManipContext();
+MPxContext* PhysicsManipContextCommand::makeObj() {
+    return new PhysicsManipContext();
 }
 
-void* CustomMoveManipContextCommand::creator() {
-    return new CustomMoveManipContextCommand;
+void* PhysicsManipContextCommand::creator() {
+    return new PhysicsManipContextCommand;
 }
 
 /**
@@ -33,17 +33,17 @@ void* CustomMoveManipContextCommand::creator() {
 MStatus initializePlugin(MObject obj) {
     MStatus status;
     MFnPlugin plugin(obj, PLUGIN_COMPANY, "1.0", "Andrew Golubev");
-    status = plugin.registerContextCommand("customMoveManipContext",
-        &CustomMoveManipContextCommand::creator);
+    status = plugin.registerContextCommand("physicsManipContext",
+        &PhysicsManipContextCommand::creator);
     if (!status) {
-        MGlobal::displayError("Error registering customMoveManipContext command");
+        MGlobal::displayError("Error registering physicsManipContext command");
         return status;
     }
-    status = plugin.registerNode("customMoveManip", CustomMoveManip::id,
-        &CustomMoveManip::creator, &CustomMoveManip::initialize,
+    status = plugin.registerNode("physicsMoveManip", PhysicsMoveManip::id,
+        &PhysicsMoveManip::creator, &PhysicsMoveManip::initialize,
         MPxNode::kManipContainer);
     if (!status) {
-        MGlobal::displayError("Error registering customMoveManip node");
+        MGlobal::displayError("Error registering physicsMoveManip node");
         return status;
     }
     return status;
@@ -57,14 +57,14 @@ MStatus initializePlugin(MObject obj) {
 MStatus uninitializePlugin(MObject obj) {
     MStatus status;
     MFnPlugin plugin(obj);
-    status = plugin.deregisterContextCommand("customMoveManipContext");
+    status = plugin.deregisterContextCommand("physicsManipContext");
     if (!status) {
-        MGlobal::displayError("Error deregistering customMoveManipContext command");
+        MGlobal::displayError("Error deregistering physicsManipContext command");
         return status;
     }
-    status = plugin.deregisterNode(CustomMoveManip::id);
+    status = plugin.deregisterNode(PhysicsMoveManip::id);
     if (!status) {
-        MGlobal::displayError("Error deregistering customMoveManip node");
+        MGlobal::displayError("Error deregistering physicsMoveManip node");
         return status;
     }
     return status;

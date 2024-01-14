@@ -1,30 +1,30 @@
-#include <CustomMoveManip.h>
-#include <MayaIncludes.h>
+#include "PhysicsMoveManip.h"
+#include "../MayaIncludes.h"
 #include <LinearMath/btScalar.h>
 
-MTypeId CustomMoveManip::id(0x8001d);
+MTypeId PhysicsMoveManip::id(0x8001d);
 
-CustomMoveManip::CustomMoveManip():
+PhysicsMoveManip::PhysicsMoveManip():
         bulletCollisionHandler(BulletCollisionHandler::getInstance()),
         collisionCandidatesFinder(CollisionCandidatesFinder::getInstance()) {
 }
 
-CustomMoveManip::~CustomMoveManip() {
+PhysicsMoveManip::~PhysicsMoveManip() {
 
 }
 
-void* CustomMoveManip::creator() {
-    return new CustomMoveManip();
+void* PhysicsMoveManip::creator() {
+    return new PhysicsMoveManip();
 }
 
-MStatus CustomMoveManip::initialize() {
+MStatus PhysicsMoveManip::initialize() {
     MStatus stat;
     stat = MPxManipContainer::initialize();
-    MGlobal::displayInfo("CustomMoveManip initialized");
+    MGlobal::displayInfo("PhysicsMoveManip initialized");
     return stat;
 }
 
-MStatus CustomMoveManip::createChildren() {
+MStatus PhysicsMoveManip::createChildren() {
     MStatus stat = MStatus::kSuccess;
     this->fFreePointManipDagPath = addFreePointTriadManip("pointManip","freePoint");
     MFnFreePointTriadManip manipFn(this->fFreePointManipDagPath);
@@ -33,26 +33,26 @@ MStatus CustomMoveManip::createChildren() {
     return stat;
 }
 
-MStatus CustomMoveManip::connectToDependNode(const MObject& node) {
+MStatus PhysicsMoveManip::connectToDependNode(const MObject& node) {
     MStatus stat;
     this->finishAddingManips();
     MPxManipContainer::connectToDependNode(node);
     return stat;
 }
 
-void CustomMoveManip::updateManipLocation(const MVector vector) {
+void PhysicsMoveManip::updateManipLocation(const MVector vector) {
     MFnFreePointTriadManip manipFn(this->fFreePointManipDagPath);
     manipFn.setTranslation(vector, MSpace::kWorld);
     this->currentManipPosition = vector;
     MStatus status;
 }
 
-MStatus CustomMoveManip::doPress() {
+MStatus PhysicsMoveManip::doPress() {
     MStatus status = MPxManipContainer::doPress();
     return status;
 }
 
-MStatus CustomMoveManip::doDrag() {
+MStatus PhysicsMoveManip::doDrag() {
     // object pos of locator
     MPoint currentPosition;
     this->getConverterManipValue(0, currentPosition);
@@ -127,7 +127,7 @@ MStatus CustomMoveManip::doDrag() {
     return MS::kUnknownParameter;
 }
 
-void CustomMoveManip::applyTransformAndRotateToActiveObjectTransform(MMatrix matrix, std::string name) {
+void PhysicsMoveManip::applyTransformAndRotateToActiveObjectTransform(MMatrix matrix, std::string name) {
     if (this->collisionCandidatesFinder.activeTransformMFnDagNodes.find(name) == this->collisionCandidatesFinder.activeTransformMFnDagNodes.end()) {
         return;
     }

@@ -17,8 +17,8 @@ if cmds.pluginInfo(plugin_path, query=True, loaded=True):
 cmds.loadPlugin(plugin_path)
 
 # Use your custom move manipulator context
-cmds.customMoveManipContext('customMoveManipContext1')
+cmds.physicsManipContext('physicsManipContext1')
 cmds.refresh()
 cmds.select("pCube5")
-cmds.setToolTo('customMoveManipContext1')
+cmds.setToolTo('physicsManipContext1')
 

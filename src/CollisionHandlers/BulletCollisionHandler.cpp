@@ -1,6 +1,6 @@
 #include <string>
 #include <mutex>
-#include <MayaIncludes.h>
+#include "../MayaIncludes.h"
 #include "BulletCollisionHandler.h"
 #include <BulletCollision/Gimpact/btGImpactShape.h>
 #include <BulletCollision/Gimpact/btGImpactCollisionAlgorithm.h>

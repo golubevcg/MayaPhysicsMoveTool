@@ -6,7 +6,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <vector>
-#include <MayaIncludes.h>
+#include "../MayaIncludes.h"
 #include <unordered_map>
 
 /**

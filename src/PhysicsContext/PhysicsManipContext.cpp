@@ -1,8 +1,8 @@
-#include <CustomMoveManipContext.h>
-#include <CustomMoveManip.h>
-#include <MayaIncludes.h>
+#include "PhysicsManipContext.h"
+#include "../PhysicsManips/PhysicsMoveManip.h"
+#include "../MayaIncludes.h"
 
-CustomMoveManipContext::CustomMoveManipContext() {
+PhysicsManipContext::PhysicsManipContext() {
     MString str("Plugin move Manipulator");
     setTitleString(str);
 }
@@ -10,7 +10,7 @@ CustomMoveManipContext::CustomMoveManipContext() {
 /**
  * Called when the tool is activated. Sets up the help string and selection changed callback.
  */
-void CustomMoveManipContext::toolOnSetup(MEvent&) {
+void PhysicsManipContext::toolOnSetup(MEvent&) {
     MString str("Move the object using the manipulator");
     setHelpString(str);
     MStatus status;
@@ -23,7 +23,7 @@ void CustomMoveManipContext::toolOnSetup(MEvent&) {
 /**
  * Called when the tool is deactivated. Cleans up by removing the callback.
  */
-void CustomMoveManipContext::toolOffCleanup() {
+void PhysicsManipContext::toolOffCleanup() {
     MStatus status;
     status = MModelMessage::removeCallback(this->id);
     if (!status) {
@@ -38,27 +38,27 @@ void CustomMoveManipContext::toolOffCleanup() {
  * and initializes bullet3 dynamics world.
  * @param data Custom data for the callback.
  */
-void CustomMoveManipContext::selectionChanged(void* data) {
-    CustomMoveManipContext* ctxPtr = (CustomMoveManipContext*)data;
+void PhysicsManipContext::selectionChanged(void* data) {
+    PhysicsManipContext* ctxPtr = (PhysicsManipContext*)data;
     ctxPtr->deleteManipulators();
 
-    CustomMoveManipContext::setupDynamicWorldSingletons();
+    PhysicsManipContext::setupDynamicWorldSingletons();
 
     // Create a single manipulator at the average position
-    MString manipName("customMoveManip");
+    MString manipName("physicsMoveManip");
     MObject manipObject;
-    CustomMoveManip* manipulator = (CustomMoveManip*)CustomMoveManip::newManipulator(manipName, manipObject);
+    PhysicsMoveManip* manipulator = (PhysicsMoveManip*)PhysicsMoveManip::newManipulator(manipName, manipObject);
 
     if (manipulator != NULL) {
         MVector avgPosition;
-        avgPosition = CustomMoveManipContext::getAveragePositionFromSelection();
+        avgPosition = PhysicsManipContext::getAveragePositionFromSelection();
 
         ctxPtr->addManipulator(manipObject);
         manipulator->updateManipLocation(avgPosition);
     }
 }
 
-void CustomMoveManipContext::setupDynamicWorldSingletons() {
+void PhysicsManipContext::setupDynamicWorldSingletons() {
     CollisionCandidatesFinder& collisionCandidatesFinder = CollisionCandidatesFinder::getInstance();
     collisionCandidatesFinder.addActiveObjects();
     if (collisionCandidatesFinder.allSceneMFnMeshes.empty()) {
@@ -71,7 +71,7 @@ void CustomMoveManipContext::setupDynamicWorldSingletons() {
     bulletCollisionHandler.updateColliders(collisionCandidatesFinder.allSceneMFnMeshes, collisionCandidatesFinder.activeMFnMeshes);
 }
 
-MVector CustomMoveManipContext::getAveragePositionFromSelection() {
+MVector PhysicsManipContext::getAveragePositionFromSelection() {
     MVector avgPosition(0.0, 0.0, 0.0);
 
     MStatus stat = MStatus::kSuccess;

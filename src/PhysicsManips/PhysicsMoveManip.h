@@ -1,22 +1,22 @@
-#ifndef CUSTOM_MOVE_MANIP_H
-#define CUSTOM_MOVE_MANIP_H
+#ifndef PHYSICS_MOVE_MANIP_H
+#define PHYSICS_MOVE_MANIP_H
 
-#include <MayaIncludes.h>
-#include <CollisionCandidatesFinder.h>
-#include <BulletCollisionHandler.h>
+#include "../MayaIncludes.h"
+#include "../CollisionHandlers/CollisionCandidatesFinder.h"
+#include "../CollisionHandlers/BulletCollisionHandler.h"
 
 /**
- * @class CustomMoveManip
+ * @class PhysicsMoveManip
  * @brief Custom manipulator container class for move operations.
  *
  * This class extends MPxManipContainer to create a custom manipulator for moving objects.
  * It integrates with Maya's manipulation framework and provides functionalities for
  * drag, press, and release events. It also interfaces with collision detection and physics handling.
  */
-class CustomMoveManip : public MPxManipContainer {
+class PhysicsMoveManip : public MPxManipContainer {
     public:
-        CustomMoveManip();
-        ~CustomMoveManip() override;
+        PhysicsMoveManip();
+        ~PhysicsMoveManip() override;
 
         // Factory method and initializer
         static void* creator();
@@ -53,4 +53,4 @@ class CustomMoveManip : public MPxManipContainer {
         MPoint currentManipPosition;
 };
 
-#endif // CUSTOM_MOVE_MANIP_H
+#endif // PHYSICS_MOVE_MANIP_H
