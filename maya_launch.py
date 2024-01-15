@@ -1,13 +1,13 @@
 import maya.cmds as cmds
 
 # Specify the test scene path
-test_scene_path = "C:/Users/golub/Documents/maya_viewport_collision_plugin/test/collisions_test_scene_no_plane_sphere.mb"
+test_scene_path = ".../MayaPhysicsMoveTool/test/simple_test_scene.mb"
 
 # Open the test scene
 cmds.file(test_scene_path, open=True, force=True)
 
 # Specify the plugin path
-plugin_path = "C:/Users/golub/Documents/maya_viewport_collision_plugin/build/lib/Release/MayaViewportCollisionsPlugin.mll"
+plugin_path = ".../MayaPhysicsMoveTool/build/lib/Release/MayaViewportCollisionsPlugin.mll"
 
 # Unload the plugin if it's loaded
 if cmds.pluginInfo(plugin_path, query=True, loaded=True):
