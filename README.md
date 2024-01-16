@@ -3,6 +3,8 @@
 ## Overview
 PhysicsMoveTool is a preliminary plugin for Autodesk Maya, offering a glimpse into real-time collision detection in the viewport. Ideal for basic usage, this early iteration enables users to move objects within the viewport with dynamic collision responses. While it provides a novel approach to interaction in Maya, it's best suited for simple scenes with limited geometry, as performance may vary with more complex environments. This tool represents a foundational step towards more robust future developments.
 
+It is important to note that, at the moment, it is in the very early development stage with very limited usage.
+
 ## System Requirements
 - **Operating System:** Windows 10 x64
 - **IDE:** Visual Studio 2019 (version 7.8 or later)
