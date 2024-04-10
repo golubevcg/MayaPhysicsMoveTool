@@ -29,3 +29,6 @@ It is important to note that, at the moment, it is in the very early development
 ## Usage
 PhysicsMoveTool enhances Maya's viewport by adding real-time collision detection for moving objects. Test the functionality using the `simple_test_scene.mb` located in the `test` directory. As you move objects around, they will exhibit realistic physical interactions, avoiding overlap and responding to collisions appropriately.
 ![difftool_gif](readme_images/collision_detection_example.gif)
+
+Article about the tool on my website:
+[Prototyping Maya Physics Move Tool](https://golubevcg.com/post/prototyping_maya_physics_move_tool_with__c++)
